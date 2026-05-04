@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
@@ -181,11 +182,21 @@ function ConfirmationContent() {
 }
 
 export default function PaymentConfirmationPage() {
+  const isReady = useProtectedRoute(); // Bảo vệ trang - redirect nếu chưa login
+
+  if (!isReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F8F8]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0EA5E9]"></div>
+      </div>
+    );
+  }
+
   return (
     <Suspense
       fallback={
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0EA5E9]"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0EA5E9]\"></div>
         </div>
       }
     >
