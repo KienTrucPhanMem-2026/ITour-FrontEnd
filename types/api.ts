@@ -56,6 +56,10 @@ export interface TourDTO {
   createdAt?: string;
   updatedAt?: string;
   schedules?: TourScheduleDTO[];  // Tour schedules from backend
+  startDestinationName?: string;  // Location name for filter
+  endDestinationName?: string;    // Location name for filter
+  availableSlots?: number;        // Available slots
+  vehicleType?: string;           // Vehicle type
 }
 
 // ---------- TourSchedule ----------

@@ -1,35 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { getToursAPI } from "@/lib/api/tours";
 import { getStoredUser, clearStoredUser } from "@/lib/auth";
 import { logoutAPI } from "@/lib/api/auth";
 import type { TourDTO, UserProfile } from "@/types/api";
+import TourCard from "@/components/TourCard";
 
-// ────────────────────────────────────────────────
-// Helpers
-// ────────────────────────────────────────────────
-
-/** Tạo slug từ tour name để dùng trong URL */
-function makeSlug(tour: TourDTO): string {
-  const namePart = (tour.name ?? "tour")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-  return namePart;
-}
-
-/** Format giá tour */
-function formatPrice(price?: number): string {
-  if (!price) return "Liên hệ";
-  return `${(price / 1_000_000).toFixed(1)}M₫`;
-}
-
-/** Map tourType → label tiếng Việt */
 const TOUR_TYPE_LABELS: Record<string, string> = {
   BEACH: "Biển",
   MOUNTAIN: "Núi",
@@ -39,85 +17,41 @@ const TOUR_TYPE_LABELS: Record<string, string> = {
   ECO: "Sinh thái",
 };
 
-// ────────────────────────────────────────────────
-// TourCard
-// ────────────────────────────────────────────────
-function TourCard({ tour }: { tour: TourDTO }) {
-  const slug = makeSlug(tour);
-  const typeLabel = tour.tourType ? TOUR_TYPE_LABELS[tour.tourType] ?? tour.tourType : "Tour";
+const VEHICLE_LABELS: Record<string, string> = {
+  BUS: "Xe bus",
+  CAR: "Ô tô",
+  PLANE: "Máy bay",
+  TRAIN: "Tàu hỏa",
+  BOAT: "Tàu du lịch",
+};
 
-  return (
-    <Link href={`/tours/${slug}?id=${tour.id}`} className="group block">
-      <div className="bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 border border-gray-100 group-hover:-translate-y-1">
-        {/* Image placeholder */}
-        <div className="relative h-48 bg-gradient-to-br from-[#0EA5E9] to-[#38BDF8] flex items-center justify-center">
-          <svg className="w-16 h-16 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1}
-              d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-          {tour.tourType && (
-            <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm text-[#0EA5E9] text-xs font-bold px-3 py-1 rounded-full">
-              {typeLabel}
-            </span>
-          )}
-          {tour.rating && (
-            <span className="absolute top-3 right-3 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1">
-              ★ {tour.rating.toFixed(1)}
-            </span>
-          )}
-        </div>
-
-        <div className="p-5">
-          <h3 className="font-bold text-gray-900 text-base mb-2 line-clamp-2 group-hover:text-[#0EA5E9] transition-colors">
-            {tour.name}
-          </h3>
-
-          {tour.description && (
-            <p className="text-gray-500 text-sm mb-3 line-clamp-2">{tour.description}</p>
-          )}
-
-          <div className="flex items-center gap-3 text-xs text-gray-500 mb-4 flex-wrap">
-            {tour.durationDays && (
-              <span className="flex items-center gap-1">
-                🕐 {tour.durationDays} ngày{tour.durationNights ? `/${tour.durationNights} đêm` : ""}
-              </span>
-            )}
-            {tour.maximumSlots && (
-              <span className="flex items-center gap-1">👥 Tối đa {tour.maximumSlots} người</span>
-            )}
-            {tour.startDate && (
-              <span className="flex items-center gap-1">
-                📅 {new Date(tour.startDate).toLocaleDateString("vi-VN")}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-2xl font-bold text-[#00D084]">{formatPrice(tour.price)}</div>
-              <div className="text-xs text-gray-400">/ người</div>
-            </div>
-            <span className="px-4 py-2 bg-[#0EA5E9] text-white text-sm font-semibold rounded-full hover:bg-[#0284C7] transition-colors">
-              Xem chi tiết
-            </span>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
+// Price range helper
+function getPriceRange(range: string | null): [number, number] {
+  switch (range) {
+    case "under-5": return [0, 5000000];
+    case "5-10": return [5000000, 10000000];
+    case "10-20": return [10000000, 20000000];
+    case "over-20": return [20000000, 500000000];
+    default: return [0, 500000000];
+  }
 }
 
-// ────────────────────────────────────────────────
-// Main Page
-// ────────────────────────────────────────────────
+
 export default function ToursPage() {
-  const [tours, setTours] = useState<TourDTO[]>([]);
+  const [allTours, setAllTours] = useState<TourDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<"price-asc" | "price-desc" | "rating">("rating");
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+
+  // Search & Filter
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [priceRange, setPriceRange] = useState<string | null>(null);
+  const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const [startDateFrom, setStartDateFrom] = useState<string>("");
+  const [startDateTo, setStartDateTo] = useState<string>("");
+  const [sortBy, setSortBy] = useState<"price-asc" | "price-desc" | "rating" | "available">("rating");
 
   useEffect(() => {
     setCurrentUser(getStoredUser());
@@ -129,7 +63,7 @@ export default function ToursPage() {
       setLoading(true);
       setError(null);
       const data = await getToursAPI();
-      setTours(data);
+      setAllTours(data);
     } catch (err) {
       console.error("Failed to fetch tours:", err);
       setError("Không thể tải danh sách tour. Vui lòng thử lại.");
@@ -147,20 +81,80 @@ export default function ToursPage() {
     }
   };
 
-  // Filter
-  const filtered = selectedType
-    ? tours.filter((t) => t.tourType === selectedType)
-    : tours;
+  // Get unique values for filters
+  const tourTypes = useMemo(() =>
+    Array.from(new Set(allTours.map(t => t.tourType).filter(Boolean))) as string[],
+    [allTours]
+  );
+
+  const destinations = useMemo(() =>
+    Array.from(new Set(allTours.map(t => t.startDestinationName).filter(Boolean))) as string[],
+    [allTours]
+  );
+
+  const vehicleTypes = useMemo(() =>
+    Array.from(new Set(allTours.map(t => t.vehicleType).filter(Boolean))) as string[],
+    [allTours]
+  );
+
+  // Filter & Sort logic
+  const filtered = useMemo(() => {
+    const [minPrice, maxPrice] = getPriceRange(priceRange);
+
+    return allTours.filter(tour => {
+      // Search
+      const searchLower = searchTerm.toLowerCase();
+      if (searchTerm && !(
+        tour.name?.toLowerCase().includes(searchLower) ||
+        tour.startDestinationName?.toLowerCase().includes(searchLower) ||
+        tour.endDestinationName?.toLowerCase().includes(searchLower)
+      )) {
+        return false;
+      }
+
+      // Tour type
+      if (selectedType && tour.tourType !== selectedType) {
+        return false;
+      }
+
+      // Price range
+      if (tour.price && (tour.price < minPrice || tour.price > maxPrice)) {
+        return false;
+      }
+
+      // Destination
+      if (selectedDestination && tour.startDestinationName !== selectedDestination) {
+        return false;
+      }
+
+      // Vehicle
+      if (selectedVehicle && tour.vehicleType !== selectedVehicle) {
+        return false;
+      }
+
+      // Date range
+      if (startDateFrom && tour.startDate && new Date(tour.startDate) < new Date(startDateFrom)) {
+        return false;
+      }
+      if (startDateTo && tour.startDate && new Date(tour.startDate) > new Date(startDateTo)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [allTours, searchTerm, selectedType, priceRange, selectedDestination, selectedVehicle, startDateFrom, startDateTo]);
 
   // Sort
-  const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === "price-asc") return (a.price ?? 0) - (b.price ?? 0);
-    if (sortBy === "price-desc") return (b.price ?? 0) - (a.price ?? 0);
-    return (b.rating ?? 0) - (a.rating ?? 0);
-  });
-
-  // Unique tour types
-  const tourTypes = Array.from(new Set(tours.map((t) => t.tourType).filter(Boolean))) as string[];
+  const sorted = useMemo(() => {
+    const copy = [...filtered];
+    copy.sort((a, b) => {
+      if (sortBy === "price-asc") return (a.price ?? 0) - (b.price ?? 0);
+      if (sortBy === "price-desc") return (b.price ?? 0) - (a.price ?? 0);
+      if (sortBy === "available") return (b.availableSlots ?? 0) - (a.availableSlots ?? 0);
+      return (b.rating ?? 0) - (a.rating ?? 0);
+    });
+    return copy;
+  }, [filtered, sortBy]);
 
   return (
     <div className="min-h-screen bg-[#F5F8F8]">
@@ -187,12 +181,10 @@ export default function ToursPage() {
             {currentUser ? (
               <>
                 <span className="text-sm text-gray-700 font-medium hidden md:block">
-                  Xin chào, {currentUser.fullName || currentUser.userName}
+                  {currentUser.fullName || currentUser.userName}
                 </span>
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2 border border-gray-200 text-sm font-semibold text-gray-600 rounded-full hover:bg-gray-50"
-                >
+                <button onClick={handleLogout}
+                  className="px-4 py-2 border border-gray-200 text-sm font-semibold text-gray-600 rounded-full hover:bg-gray-50">
                   Đăng xuất
                 </button>
               </>
@@ -200,8 +192,7 @@ export default function ToursPage() {
               <>
                 <Link href="/login" className="text-sm font-semibold text-[#0EA5E9]">Đăng nhập</Link>
                 <Link href="/register"
-                  className="px-4 py-2 bg-[#0EA5E9] text-white rounded-full text-sm font-semibold hover:bg-[#0284C7]"
-                >
+                  className="px-4 py-2 bg-[#0EA5E9] text-white rounded-full text-sm font-semibold hover:bg-[#0284C7]">
                   Đăng ký
                 </Link>
               </>
@@ -210,95 +201,202 @@ export default function ToursPage() {
         </div>
       </header>
 
-      {/* ── Page Header ── */}
-      <section className="bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8] text-white py-12">
-        <div className="max-w-7xl mx-auto px-6">
-          <h1 className="text-4xl font-bold mb-2">Danh Sách Tour Du Lịch</h1>
-          <p className="text-blue-100">
-            {loading ? "Đang tải..." : `Khám phá ${tours.length} tour du lịch hấp dẫn`}
+      {/* ── Search Section ── */}
+      <section className="bg-gradient-to-r from-sky-500 to-sky-400 text-white py-10">
+        <div className="max-w-5xl mx-auto px-6 text-center">
+
+          {/* Title */}
+          <h1 className="text-3xl md:text-4xl font-semibold mb-3">
+            Tìm kiếm tour du lịch
+          </h1>
+
+          <p className="text-sm text-sky-100 mb-6">
+            Khám phá hàng trăm tour hấp dẫn với giá tốt
           </p>
+
+          {/* Search box */}
+          <div className="flex items-center bg-white rounded-xl shadow-md overflow-hidden max-w-2xl mx-auto">
+
+            <input
+              type="text"
+              placeholder="Bạn muốn đi đâu?"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 px-4 py-3 text-gray-800 text-sm outline-none"
+            />
+
+            <button className="px-5 py-3 bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition">
+              Tìm kiếm
+            </button>
+          </div>
+
+          {/* Result */}
+          <p className="text-xs text-sky-100 mt-4">
+            {loading ? "Đang tải..." : `Có ${sorted.length} tour phù hợp`}
+          </p>
+
         </div>
       </section>
 
-      {/* ── Main Content ── */}
       <div className="max-w-7xl mx-auto px-6 py-12">
         {error ? (
-          /* Error state */
           <div className="text-center py-20">
             <div className="text-5xl mb-4">😞</div>
             <p className="text-gray-600 text-lg mb-4">{error}</p>
-            <button
-              onClick={fetchTours}
-              className="px-6 py-3 bg-[#0EA5E9] text-white rounded-full font-semibold hover:bg-[#0284C7]"
-            >
+            <button onClick={fetchTours}
+              className="px-6 py-3 bg-[#0EA5E9] text-white rounded-full font-semibold hover:bg-[#0284C7]">
               Thử lại
             </button>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-            {/* ── Sidebar ── */}
+            {/* ── Sidebar Filter ── */}
             <aside className="lg:col-span-1">
-              <div className="bg-white rounded-2xl p-6 shadow-md">
-                {/* Type filter */}
-                <div className="mb-8">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Loại Tour</h3>
-                  <div className="space-y-2">
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-6 sticky top-24">
+
+                {/* Tour Type */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Loại tour</h3>
+                  <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => setSelectedType(null)}
-                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                        selectedType === null
-                          ? "bg-[#0EA5E9] text-white font-semibold"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                    >
-                      Tất cả ({tours.length})
+                      className={`px-3 py-1.5 text-xs rounded-full transition ${selectedType === null
+                        ? "bg-sky-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}>
+                      Tất cả ({allTours.length})
                     </button>
-                    {tourTypes.map((type) => {
-                      const label = TOUR_TYPE_LABELS[type] ?? type;
-                      const count = tours.filter((t) => t.tourType === type).length;
+
+                    {tourTypes.map(type => {
+                      const count = allTours.filter(t => t.tourType === type).length;
                       return (
                         <button
                           key={type}
                           onClick={() => setSelectedType(selectedType === type ? null : type)}
-                          className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                            selectedType === type
-                              ? "bg-[#0EA5E9] text-white font-semibold"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          {label} ({count})
+                          className={`px-3 py-1.5 text-xs rounded-full transition ${selectedType === type
+                            ? "bg-sky-600 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}>
+                          {TOUR_TYPE_LABELS[type] ?? type} ({count})
                         </button>
                       );
                     })}
                   </div>
                 </div>
 
+                {/* Price */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Ngân sách</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: "Tất cả", value: null },
+                      { label: "Dưới 5tr", value: "under-5" },
+                      { label: "5 - 10tr", value: "5-10" },
+                      { label: "10 - 20tr", value: "10-20" },
+                      { label: "20tr+", value: "over-20" },
+                    ].map(item => (
+                      <button
+                        key={item.label}
+                        onClick={() => setPriceRange(item.value as any)}
+                        className={`px-3 py-1.5 text-xs rounded-full transition ${priceRange === item.value
+                          ? "bg-sky-600 text-white"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}>
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Destination */}
+                {destinations.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Điểm khởi hành</h3>
+                    <select
+                      value={selectedDestination ?? ""}
+                      onChange={(e) => setSelectedDestination(e.target.value || null)}
+                      className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
+                      <option value="">Tất cả</option>
+                      {destinations.map(dest => (
+                        <option key={dest} value={dest}>{dest}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Vehicle */}
+                {vehicleTypes.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Phương tiện</h3>
+                    <select
+                      value={selectedVehicle ?? ""}
+                      onChange={(e) => setSelectedVehicle(e.target.value || null)}
+                      className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
+                      <option value="">Tất cả</option>
+                      {vehicleTypes.map(vehicle => (
+                        <option key={vehicle} value={vehicle}>
+                          {VEHICLE_LABELS[vehicle] ?? vehicle}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Date */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Ngày đi</h3>
+                  <div className="flex gap-2">
+                    <input
+                      type="date"
+                      value={startDateFrom}
+                      onChange={(e) => setStartDateFrom(e.target.value)}
+                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                    />
+                    {/* <input
+                      type="date"
+                      value={startDateTo}
+                      onChange={(e) => setStartDateTo(e.target.value)}
+                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                    /> */}
+                  </div>
+                </div>
+
                 {/* Sort */}
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Sắp xếp</h3>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Sắp xếp</h3>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
-                  >
-                    <option value="rating">Đánh giá cao nhất</option>
-                    <option value="price-asc">Giá thấp nhất</option>
-                    <option value="price-desc">Giá cao nhất</option>
+                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
+                    <option value="rating">Đánh giá cao</option>
+                    <option value="price-asc">Giá thấp</option>
+                    <option value="price-desc">Giá cao</option>
+                    <option value="available">Còn chỗ</option>
                   </select>
                 </div>
+
+                {/* Reset */}
+                <button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedType(null);
+                    setPriceRange(null);
+                    setSelectedDestination(null);
+                    setSelectedVehicle(null);
+                    setStartDateFrom("");
+                    setStartDateTo("");
+                    setSortBy("rating");
+                  }}
+                  className="w-full text-sm py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition">
+                  Xóa bộ lọc
+                </button>
+
               </div>
             </aside>
 
             {/* ── Tours Grid ── */}
             <main className="lg:col-span-3">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {loading ? "Đang tải tour..." : `${sorted.length} Tour`}
-                </h2>
-              </div>
-
               {loading ? (
-                /* Loading skeleton */
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {[...Array(6)].map((_, i) => (
                     <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-md animate-pulse">
@@ -314,16 +412,26 @@ export default function ToursPage() {
                 </div>
               ) : sorted.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {sorted.map((tour) => (
-                    <TourCard key={tour.id} tour={tour} />
-                  ))}
+                  {sorted.map(tour => <TourCard key={tour.id} tour={tour} />)}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <div className="text-5xl mb-4">🔍</div>
+                <div className="text-center py-16">
+                  <div className="text-6xl mb-4">🔍</div>
                   <p className="text-gray-600 text-lg">
-                    Không tìm thấy tour nào phù hợp.
+                    Không tìm thấy tour nào phù hợp với bộ lọc của bạn.
                   </p>
+                  <button onClick={() => {
+                    setSearchTerm("");
+                    setSelectedType(null);
+                    setPriceRange(null);
+                    setSelectedDestination(null);
+                    setSelectedVehicle(null);
+                    setStartDateFrom("");
+                    setStartDateTo("");
+                  }}
+                    className="mt-6 px-6 py-2 bg-[#0EA5E9] text-white rounded-full font-semibold hover:bg-[#0284C7]">
+                    Xóa bộ lọc
+                  </button>
                 </div>
               )}
             </main>
