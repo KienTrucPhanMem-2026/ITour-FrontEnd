@@ -59,7 +59,8 @@ export interface TourDTO {
   startDestinationName?: string;  // Location name for filter
   endDestinationName?: string;    // Location name for filter
   availableSlots?: number;        // Available slots
-  vehicleType?: string;           // Vehicle type
+  vehicleType?: string;     
+  images: []      // Vehicle type
 }
 
 // ---------- TourSchedule ----------

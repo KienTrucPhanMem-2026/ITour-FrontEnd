@@ -7,53 +7,53 @@ import { getTourByIdAPI } from "@/lib/api/tours";
 import { getStoredUser } from "@/lib/auth";
 import type { TourDTO } from "@/types/api";
 
-// ─── Helper functions ─────────────────────────
+// ─── Helpers ─────────────────────────
 function formatPrice(price?: number): string {
   if (!price) return "Liên hệ";
-  return `${(price / 1_000_000).toFixed(1)}M₫`;
+  return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" })
+    .format(price)
+    .replace("₫", "đ");
 }
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("vi-VN", {
     day: "2-digit",
-    month: "2-digit",
+    month: "short",
     year: "numeric",
   });
 }
 
-// ─────────────────────────────────────────────────────────────────
 export default function TourDetailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
-  // Get ID from query parameter
   const tourId = searchParams.get("id") || "";
 
-  // Data state
   const [tour, setTour] = useState<TourDTO | null>(null);
   const [loadingTour, setLoadingTour] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Booking form state
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
+  const [selectedImage, setSelectedImage] = useState(0);
+
+  const images = [
+    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
+    "https://images.unsplash.com/photo-1493558103817-58b2924bce98",
+    "https://images.unsplash.com/photo-1501785888041-af3ef285b470",
+  ];
 
   useEffect(() => {
-    if (tourId) {
-      fetchTourData(tourId);
-    }
+    if (tourId) fetchTourData(tourId);
   }, [tourId]);
 
   const fetchTourData = async (id: string) => {
     try {
       setLoadingTour(true);
-      setError(null);
       const tourData = await getTourByIdAPI(id);
       setTour(tourData);
     } catch {
-      setError("Không thể tải thông tin tour. Vui lòng thử lại.");
+      setError("Không thể tải thông tin tour.");
     } finally {
       setLoadingTour(false);
     }
@@ -62,398 +62,236 @@ export default function TourDetailPage() {
   const handleBooking = () => {
     const currentUser = getStoredUser();
     if (!currentUser) {
-      // Build redirect URL properly - go back to current tour page after login
-      if (typeof window !== "undefined") {
-        const currentUrl = window.location.pathname + window.location.search;
-        router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
-      } else {
-        router.push(`/login?redirect=/tours/tour?id=${tourId}`);
-      }
+      const currentUrl = window.location.pathname + window.location.search;
+      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
       return;
     }
-    if (!selectedScheduleId) {
-      alert("Vui lòng chọn lịch khởi hành!");
-      return;
-    }
+    if (!selectedScheduleId) return alert("Vui lòng chọn lịch khởi hành!");
 
-    const searchParams = new URLSearchParams({
-      tourId: tourId,
+    const params = new URLSearchParams({
+      tourId,
       scheduleId: selectedScheduleId,
       adults: adults.toString(),
       children: children.toString(),
     });
-    router.push(`/payment?${searchParams.toString()}`);
+    router.push(`/payment?${params.toString()}`);
   };
 
-  // ── Loading ──
-  if (loadingTour) {
-    return (
-      <div className="min-h-screen bg-[#F5F8F8]">
-        <div className="max-w-6xl mx-auto px-6 py-12 animate-pulse">
-          <div className="h-64 bg-gray-200 rounded-2xl mb-8" />
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-4">
-              <div className="h-8 bg-gray-200 rounded w-3/4" />
-              <div className="h-4 bg-gray-200 rounded w-full" />
-              <div className="h-4 bg-gray-200 rounded w-5/6" />
-            </div>
-            <div className="h-64 bg-gray-200 rounded-2xl" />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  if (loadingTour) return <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>;
+  if (error || !tour) return <div className="p-20 text-center text-red-500 font-bold">{error || "Tour không tồn tại"}</div>;
 
-  // ── Error ──
-  if (error || !tour) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F5F8F8]">
-        <div className="text-center">
-          <div className="text-5xl mb-4">😞</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">{error || "Tour không tìm thấy"}</h1>
-          <Link href="/tours" className="text-[#0EA5E9] hover:underline">
-            Quay lại danh sách tour
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  // Tổng số người & giá
-  const totalPeople = adults + children;
   const schedules = tour?.schedules || [];
   const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
   const unitPrice = selectedSchedule?.price ?? tour?.price ?? 0;
-  const totalPrice = unitPrice * adults + (unitPrice * 0.7) * children; // trẻ em 70%
+  const totalPrice = unitPrice * adults + unitPrice * 0.7 * children;
 
   return (
-    <div className="min-h-screen bg-[#F5F8F8]">
-      {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
+    <div className="min-h-screen bg-white font-sans text-slate-900">
+      {/* Header */}
+      <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#0EA5E9] flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+          <Link href="/" className="flex items-center gap-2 group">
+            <div className="w-9 h-9 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-200 transition-transform group-hover:scale-105">
+              <span className="font-bold text-xs">DL</span>
             </div>
-            <span className="text-xl font-bold text-gray-900">Du Lịch Việt</span>
+            <span className="text-lg font-bold tracking-tight">Du Lịch Việt</span>
           </Link>
-          <Link href="/tours" className="text-sm font-semibold text-[#0EA5E9] hover:underline">
-            ← Quay lại danh sách
+          <Link href="/tours" className="text-sm font-medium text-slate-500 hover:text-sky-600 transition">
+            ← Quay lại khám phá
           </Link>
         </div>
       </header>
 
-      {/* ── Main Content ── */}
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        {/* Tour Header */}
-        <div className="bg-white rounded-2xl p-8 mb-8 border border-gray-100 shadow-sm">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2">
-              {/* Tour type badge */}
-              {tour.tourType && (
-                <span className="inline-block mb-3 px-3 py-1 bg-[#E0F2FE] text-[#0EA5E9] text-xs font-bold rounded-full uppercase tracking-wide">
-                  {tour.tourType}
-                </span>
-              )}
-
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{tour.name}</h1>
-
-              {/* Rating */}
-              {tour.rating && (
-                <div className="flex items-center gap-2 mb-4">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <svg
-                        key={i}
-                        className={`w-5 h-5 ${
-                          i < Math.floor(tour.rating!) ? "text-yellow-400 fill-yellow-400" : "text-gray-300"
-                        }`}
-                        viewBox="0 0 20 20"
-                      >
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.95-.69l1.07-3.292z" />
-                      </svg>
-                    ))}
-                  </div>
-                  <span className="text-lg font-semibold text-gray-900">{tour.rating.toFixed(1)}/5</span>
-                </div>
-              )}
-
-              {tour.description && (
-                <p className="text-gray-700 leading-relaxed mb-4">{tour.description}</p>
-              )}
-
-              {/* Quick info */}
-              <div className="flex flex-wrap gap-4 text-sm">
-                {tour.durationDays && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <span className="text-[#0EA5E9]">🕐</span>
-                    <span>{tour.durationDays} ngày{tour.durationNights ? ` / ${tour.durationNights} đêm` : ""}</span>
-                  </div>
-                )}
-                {tour.maximumSlots && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <span className="text-[#0EA5E9]">👥</span>
-                    <span>Tối đa {tour.maximumSlots} người</span>
-                  </div>
-                )}
-                {tour.startDate && (
-                  <div className="flex items-center gap-2 text-gray-600">
-                    <span className="text-[#0EA5E9]">📅</span>
-                    <span>Khởi hành: {formatDate(tour.startDate)}</span>
-                  </div>
-                )}
+      <main className="max-w-7xl mx-auto px-6 py-10">
+        {/* Gallery Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-10">
+          <div className="lg:col-span-8 h-[300px] md:h-[500px] rounded-3xl overflow-hidden relative group shadow-sm">
+            <img 
+              src={images[selectedImage]} 
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
+              alt="Tour main"
+            />
+          </div>
+          <div className="lg:col-span-4 grid grid-cols-3 lg:grid-cols-1 gap-4">
+            {images.map((img, i) => (
+              <div 
+                key={i}
+                onClick={() => setSelectedImage(i)}
+                className={`cursor-pointer rounded-2xl overflow-hidden h-[100px] md:h-[155px] border-2 transition-all ${
+                  selectedImage === i ? "border-sky-500 scale-[0.98]" : "border-transparent opacity-70 hover:opacity-100"
+                }`}
+              >
+                <img src={img} className="w-full h-full object-cover" alt="thumbnail" />
               </div>
-            </div>
-
-            {/* Price card */}
-            <div className="text-center p-6 bg-gradient-to-br from-[#E0F7F0] to-[#F0FFFE] rounded-xl border border-[#00D084]">
-              <div className="text-sm text-gray-600 mb-2">Giá từ</div>
-              <div className="text-4xl font-bold text-[#00D084] mb-1">{formatPrice(tour.price)}</div>
-              <div className="text-sm text-gray-600">/ người lớn</div>
-              {tour.durationDays && (
-                <div className="mt-3 text-sm font-semibold text-gray-700">
-                  {tour.durationDays} ngày {tour.durationNights ? `${tour.durationNights} đêm` : ""}
-                </div>
-              )}
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* ── Content Grid ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* ── Left: Tour Info ── */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Description detail */}
-            {tour.description && (
-              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Mô Tả Tour</h2>
-                <p className="text-gray-700 leading-relaxed">{tour.description}</p>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Left Column: Info & Reviews */}
+          <div className="lg:col-span-2">
+            <div className="mb-8">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-3 py-1 bg-sky-50 text-sky-600 text-xs font-bold rounded-full uppercase tracking-wider">Trọn gói cao cấp</span>
+                <span className="text-slate-400 text-sm font-medium">• ★ 4.8 (120 đánh giá)</span>
               </div>
-            )}
-
-            {/* Schedules list */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Các Lịch Khởi Hành</h2>
-
-              {schedules && schedules.length > 0 ? (
-                <div className="space-y-3">
-                  {schedules.map((schedule) => {
-                    const isSelected = selectedScheduleId === schedule.id;
-                    const isFull = (schedule.availableSlot ?? 0) <= 0;
-                    return (
-                      <button
-                        key={schedule.id}
-                        onClick={() => !isFull && setSelectedScheduleId(schedule.id)}
-                        disabled={isFull}
-                        className={`w-full text-left p-4 rounded-xl border-2 transition-all ${
-                          isFull
-                            ? "border-gray-200 bg-gray-50 opacity-60 cursor-not-allowed"
-                            : isSelected
-                            ? "border-[#0EA5E9] bg-blue-50"
-                            : "border-gray-200 bg-white hover:border-[#0EA5E9]/50 hover:bg-blue-50/30"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {/* Radio indicator */}
-                            <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                              isSelected ? "border-[#0EA5E9]" : "border-gray-300"
-                            }`}>
-                              {isSelected && <div className="w-3 h-3 rounded-full bg-[#0EA5E9]" />}
-                            </div>
-
-                            <div>
-                              <div className="font-semibold text-gray-900 text-sm">
-                                {formatDate(schedule.startDate)}
-                                {schedule.endDate && ` → ${formatDate(schedule.endDate)}`}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-0.5">
-                                {isFull ? (
-                                  <span className="text-red-500">Hết chỗ</span>
-                                ) : (
-                                  <span className="text-green-600">Còn {schedule.availableSlot} chỗ trống</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="text-right">
-                            <div className="font-bold text-[#00D084]">
-                              {schedule.price ? formatPrice(schedule.price) : formatPrice(tour?.price)}
-                            </div>
-                            <div className="text-xs text-gray-400">/ người</div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <div className="text-4xl mb-2">📅</div>
-                  <p>Hiện chưa có lịch khởi hành cho tour này.</p>
-                  <p className="text-sm mt-1">Vui lòng liên hệ để biết thêm thông tin.</p>
-                </div>
-              )}
+              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-4">{tour.name}</h1>
+              <p className="text-lg text-slate-600 leading-relaxed font-light">{tour.description}</p>
             </div>
 
-            {/* Static reviews */}
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Đánh Giá Khách Hàng</h2>
-              <div className="space-y-4">
-                {[
-                  { name: "Hoàng Nam", rating: 5, comment: "Chuyến du lịch tuyệt vời, hướng dẫn viên rất nhiệt tình!", time: "2 ngày trước" },
-                  { name: "Trần Thu Hà", rating: 5, comment: "Cảnh đẹp tuyệt vời, dịch vụ chuyên nghiệp.", time: "1 tuần trước" },
-                  { name: "Nguyễn Văn B", rating: 4, comment: "Tour tốt, sẽ quay lại lần sau.", time: "2 tuần trước" },
-                ].map((review, idx) => (
-                  <div key={idx} className="border border-gray-100 rounded-xl p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#0EA5E9] to-[#38BDF8] flex items-center justify-center text-white font-bold text-sm">
-                          {review.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-semibold text-gray-900 text-sm">{review.name}</p>
-                          <p className="text-xs text-gray-400">{review.time}</p>
+            <hr className="my-10 border-slate-100" />
+
+            {/* Schedules Section */}
+            <section className="mb-12">
+              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                Lịch khởi hành 
+                <span className="text-sm font-normal text-slate-400 font-medium">(Chọn ngày để đặt tour)</span>
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {schedules.map((schedule) => {
+                  const isSelected = selectedScheduleId === schedule.id;
+                  const isFull = (schedule.availableSlot ?? 0) <= 0;
+                  return (
+                    <button
+                      key={schedule.id}
+                      onClick={() => !isFull && setSelectedScheduleId(schedule.id)}
+                      disabled={isFull}
+                      className={`p-5 rounded-2xl border-2 transition-all text-left relative group ${
+                        isFull ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-100" :
+                        isSelected ? "border-sky-500 bg-sky-50/50 ring-4 ring-sky-50 shadow-sm" : "border-slate-100 hover:border-sky-200"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest">Khởi hành</span>
+                        <span className="font-bold text-slate-900 text-lg">{formatDate(schedule.startDate)}</span>
+                        <span className={`text-xs font-bold ${isFull ? "text-rose-500" : "text-emerald-600"}`}>
+                          {isFull ? "● Đã hết chỗ" : `● Còn ${schedule.availableSlot} chỗ trống`}
+                        </span>
+                        <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-end">
+                           <span className="text-xs text-slate-400 font-medium font-mono tracking-tighter uppercase">Giá từ</span>
+                           <span className="text-xl font-black text-emerald-500">{formatPrice(schedule.price || tour.price)}</span>
                         </div>
                       </div>
-                      <div className="flex gap-0.5">
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <hr className="my-10 border-slate-100" />
+
+            {/* REVIEWS SECTION - ĐÃ THÊM LẠI VÀ OPTIMIZE */}
+            <section className="mb-10">
+              <div className="flex items-center justify-between mb-8">
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  Đánh giá từ khách hàng 
+                  <span className="text-sky-600 bg-sky-50 px-2 py-1 rounded-lg text-sm ml-2">★ 4.8</span>
+                </h2>
+                <button className="text-sm font-bold text-sky-600 hover:underline">Xem tất cả</button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {[
+                  { name: "Hoàng Nam", rating: 5, comment: "Chuyến du lịch tuyệt vời, hướng dẫn viên rất nhiệt tình và am hiểu kiến thức địa phương!", time: "2 ngày trước", avatar: "N" },
+                  { name: "Trần Thu Hà", rating: 5, comment: "Cảnh đẹp tuyệt vời, dịch vụ từ xe đưa đón đến khách sạn đều rất chuyên nghiệp. Rất đáng tiền.", time: "1 tuần trước", avatar: "H" },
+                  { name: "Nguyễn Văn B", rating: 4, comment: "Tour tốt, lịch trình hơi dày một chút nhưng bù lại đi được nhiều điểm đẹp. Sẽ quay lại.", time: "2 tuần trước", avatar: "B" },
+                  { name: "Minh Anh", rating: 5, comment: "Gia đình mình đã có một kỳ nghỉ rất vui. Cảm ơn đội ngũ tổ chức tour nhiều nhé!", time: "1 tháng trước", avatar: "A" },
+                ].map((review, idx) => (
+                  <div key={idx} className="p-6 rounded-2xl border border-slate-100 bg-slate-50/30 transition-all duration-300 hover:bg-white hover:shadow-xl hover:shadow-slate-100">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-xs">
+                          {review.avatar}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm">{review.name}</p>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{review.time}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-0.5 text-xs">
                         {[...Array(5)].map((_, i) => (
-                          <svg key={i} className={`w-4 h-4 ${i < review.rating ? "text-yellow-400 fill-yellow-400" : "text-gray-200"}`} viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.95-.69l1.07-3.292z" />
-                          </svg>
+                          <span key={i} className={i < review.rating ? "text-yellow-400" : "text-slate-200"}>★</span>
                         ))}
                       </div>
                     </div>
-                    <p className="text-gray-600 text-sm">{review.comment}</p>
+                    <p className="text-slate-600 text-sm leading-relaxed font-light italic">"{review.comment}"</p>
                   </div>
                 ))}
               </div>
-            </div>
+            </section>
           </div>
 
-          {/* ── Right: Booking Card ── */}
+          {/* Right Column: Booking Card */}
           <aside className="lg:col-span-1">
-            <div className="sticky top-24 bg-white rounded-2xl p-6 shadow-lg border border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900 mb-6">Đặt Tour</h3>
-
-              {/* Selected schedule summary */}
-              {selectedSchedule ? (
-                <div className="mb-5 p-3 bg-blue-50 rounded-xl border border-blue-200 text-sm">
-                  <p className="text-[#0EA5E9] font-semibold mb-1">✓ Đã chọn lịch khởi hành</p>
-                  <p className="text-gray-700">
-                    {formatDate(selectedSchedule.startDate)}
-                    {selectedSchedule.endDate && ` → ${formatDate(selectedSchedule.endDate)}`}
-                  </p>
-                </div>
-              ) : (
-                <div className="mb-5 p-3 bg-yellow-50 rounded-xl border border-yellow-200 text-sm text-yellow-700">
-                  ⚠️ Vui lòng chọn lịch khởi hành bên trái
-                </div>
-              )}
-
-              {/* Adults */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Người Lớn
-                </label>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setAdults(Math.max(1, adults - 1))}
-                    className="w-10 h-10 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 font-bold text-lg"
-                  >
-                    −
-                  </button>
-                  <span className="flex-1 text-center font-bold text-lg text-gray-900">{adults}</span>
-                  <button
-                    onClick={() => setAdults(Math.min(tour.maximumSlots ?? 20, adults + 1))}
-                    className="w-10 h-10 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 font-bold text-lg"
-                  >
-                    +
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mt-1 text-center">Giá đầy đủ</p>
+            <div className="sticky top-28 bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-2xl shadow-slate-200/50">
+              <div className="mb-8">
+                <span className="text-slate-400 text-xs font-bold uppercase tracking-widest block mb-2">Giá tạm tính</span>
+                <span className="text-3xl font-black text-slate-900 tracking-tight">{formatPrice(totalPrice)}</span>
               </div>
 
-              {/* Children */}
-              <div className="mb-5">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Trẻ Em <span className="text-gray-400 font-normal">(dưới 12 tuổi)</span>
-                </label>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setChildren(Math.max(0, children - 1))}
-                    className="w-10 h-10 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 font-bold text-lg"
-                  >
-                    −
-                  </button>
-                  <span className="flex-1 text-center font-bold text-lg text-gray-900">{children}</span>
-                  <button
-                    onClick={() => setChildren(children + 1)}
-                    className="w-10 h-10 border border-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-50 font-bold text-lg"
-                  >
-                    +
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 mt-1 text-center">Giá 70%</p>
-              </div>
-
-              {/* Price summary */}
-              <div className="bg-gray-50 rounded-xl p-4 mb-5 space-y-2 text-sm">
-                <div className="flex justify-between text-gray-600">
-                  <span>Người lớn × {adults}</span>
-                  <span className="font-semibold">{formatPrice(unitPrice * adults)}</span>
-                </div>
-                {children > 0 && (
-                  <div className="flex justify-between text-gray-600">
-                    <span>Trẻ em × {children} (70%)</span>
-                    <span className="font-semibold">{formatPrice(unitPrice * 0.7 * children)}</span>
+              <div className="space-y-6 mb-10">
+                {/* Adults Counter */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">Người lớn</p>
+                    <p className="text-[11px] text-slate-400 font-medium">Trên 12 tuổi</p>
                   </div>
-                )}
-                <div className="border-t border-gray-200 pt-2 flex justify-between">
-                  <span className="font-bold text-gray-900">Tổng cộng</span>
-                  <span className="font-bold text-[#00D084] text-lg">{formatPrice(totalPrice)}</span>
+                  <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                    <button onClick={() => setAdults(Math.max(1, adults - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
+                    <span className="font-bold w-4 text-center text-sm">{adults}</span>
+                    <button onClick={() => setAdults(adults + 1)} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">+</button>
+                  </div>
                 </div>
-                <div className="text-xs text-gray-400 text-center">{totalPeople} người</div>
+
+                {/* Children Counter */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-slate-800 text-sm">Trẻ em</p>
+                    <p className="text-[11px] text-slate-400 font-medium">2 - 11 tuổi (-30%)</p>
+                  </div>
+                  <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
+                    <button onClick={() => setChildren(Math.max(0, children - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
+                    <span className="font-bold w-4 text-center text-sm">{children}</span>
+                    <button onClick={() => setChildren(children + 1)} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">+</button>
+                  </div>
+                </div>
               </div>
 
-              {/* Booking button */}
               <button
                 onClick={handleBooking}
-                disabled={!selectedScheduleId || !schedules || schedules.length === 0}
-                className="w-full py-3.5 bg-[#00D084] hover:bg-[#00B86F] disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors mb-3 text-sm"
+                className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-sky-600 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100 mb-4 text-sm tracking-wide"
+                disabled={!selectedScheduleId}
               >
-                {!schedules || schedules.length === 0 ? "Chưa có lịch khởi hành" : !selectedScheduleId ? "Chọn lịch khởi hành" : "Đặt Tour Ngay"}
+                {selectedScheduleId ? "Đặt hành trình ngay" : "Chọn ngày khởi hành"}
               </button>
-              <button className="w-full py-3 border border-[#0EA5E9] text-[#0EA5E9] font-semibold rounded-xl hover:bg-blue-50 transition-colors text-sm">
-                ♡ Yêu Thích
+              
+              <button className="w-full py-3 text-slate-400 font-bold text-xs hover:text-rose-500 transition-colors uppercase tracking-widest">
+                ♥ Lưu vào mục yêu thích
               </button>
 
-              {/* Trust badges */}
-              <div className="mt-5 pt-5 border-t border-gray-200 space-y-2 text-xs text-gray-500">
-                <div className="flex items-center gap-2">
-                  <span>🔒</span><span>Thanh toán an toàn 100%</span>
+              <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between gap-4">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-lg">🛡️</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Bảo mật thanh toán</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>↩️</span><span>Hủy miễn phí trước 7 ngày</span>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-lg">↩️</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Hủy tour linh hoạt</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span>🌐</span><span>Hướng dẫn viên chuyên nghiệp</span>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="text-lg">⚡</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Xác nhận ngay</span>
                 </div>
               </div>
             </div>
           </aside>
         </div>
-      </div>
+      </main>
 
-      {/* ── Footer ── */}
-      <footer className="bg-gray-900 text-gray-300 py-12 mt-12">
+      <footer className="bg-slate-50 border-t border-slate-100 py-16 mt-20">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p>© 2026 Du Lịch Việt. All rights reserved.</p>
+          <p className="text-slate-400 text-xs font-bold uppercase tracking-[0.2em] mb-2">Du Lịch Việt</p>
+          <p className="text-slate-300 text-[11px] font-medium tracking-wide">© 2026 Toàn bộ bản quyền thuộc về hành trình của bạn.</p>
         </div>
       </footer>
     </div>
