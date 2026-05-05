@@ -2,10 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { User, Booking } from "@/lib/mockData";
 import { mockBookings } from "@/lib/mockData";
+import { getStoredUser, clearStoredUser } from "@/lib/auth";
+import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const isReady = useProtectedRoute(); // Bảo vệ trang - redirect nếu chưa login
   const [user, setUser] = useState<User | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [activeTab, setActiveTab] = useState<"overview" | "bookings" | "profile">(
@@ -13,30 +18,22 @@ export default function DashboardPage() {
   );
 
   useEffect(() => {
-    // Simulate checking auth & loading user data
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    const userData = localStorage.getItem("user");
-
-    if (!isLoggedIn || !userData) {
-      window.location.href = "/login";
-      return;
+    // Load user data từ localStorage
+    const storedUser = getStoredUser();
+    if (storedUser) {
+      setUser(storedUser);
     }
-
-    const parsedUser = JSON.parse(userData);
-    setUser(parsedUser);
 
     // Load mock bookings
     setBookings(mockBookings.filter((b) => b.userId === "user-1"));
   }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("isLoggedIn");
-    window.location.href = "/";
+    clearStoredUser();
+    router.push("/");
   };
 
-  if (!user) {
+  if (!isReady || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F5F8F8]">
         <div className="text-center">
