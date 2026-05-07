@@ -5,6 +5,22 @@ import { apiFetch } from "./config";
 import type { ApiResponse, BookingRequestDTO, BookingResponseDTO } from "@/types/api";
 
 /**
+ * GET /api/bookings/customer/{customerId} — Lấy danh sách bookings của user
+ * Yêu cầu cookie JWT hợp lệ
+ */
+export async function getMyBookingsAPI(
+  customerId: string
+): Promise<BookingResponseDTO[]> {
+  const res = await apiFetch<ApiResponse<BookingResponseDTO[]>>(
+    `/bookings/customer/${customerId}`,
+    {
+      method: "GET",
+    }
+  );
+  return res.data || [];
+}
+
+/**
  * POST /api/bookings — Tạo booking mới
  * Yêu cầu cookie JWT hợp lệ (tự gửi qua credentials:include).
  */

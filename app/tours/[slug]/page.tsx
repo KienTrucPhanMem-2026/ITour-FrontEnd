@@ -5,7 +5,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTourByIdAPI } from "@/lib/api/tours";
 import { getStoredUser } from "@/lib/auth";
-import type { TourDTO } from "@/types/api";
+import { getMyBookingsAPI } from "@/lib/api/bookings";
+import ReviewList from "@/components/ReviewList";
+import ReviewForm from "@/components/ReviewForm";
+import type { TourDTO, UserProfile } from "@/types/api";
+import Header from "@/components/Header";
 
 // ─── Helpers ─────────────────────────
 function formatPrice(price?: number): string {
@@ -36,6 +40,10 @@ export default function TourDetailPage() {
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [reviewRefresh, setReviewRefresh] = useState(0);
+  const [userBookings, setUserBookings] = useState<any[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
 
   const images = [
     "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
@@ -44,7 +52,12 @@ export default function TourDetailPage() {
   ];
 
   useEffect(() => {
-    if (tourId) fetchTourData(tourId);
+    const user = getStoredUser();
+    setCurrentUser(user);
+    if (tourId) {
+      fetchTourData(tourId);
+      if (user?.id) fetchUserBookings(user.id);
+    }
   }, [tourId]);
 
   const fetchTourData = async (id: string) => {
@@ -56,6 +69,19 @@ export default function TourDetailPage() {
       setError("Không thể tải thông tin tour.");
     } finally {
       setLoadingTour(false);
+    }
+  };
+
+  const fetchUserBookings = async (customerId: string) => {
+    try {
+      setLoadingBookings(true);
+      const bookings = await getMyBookingsAPI(customerId);
+      setUserBookings(bookings);
+    } catch (err) {
+      console.error("Lỗi khi lấy danh sách booking:", err);
+      setUserBookings([]);
+    } finally {
+      setLoadingBookings(false);
     }
   };
 
@@ -77,6 +103,10 @@ export default function TourDetailPage() {
     router.push(`/payment?${params.toString()}`);
   };
 
+  const hasBookedThisTour = userBookings.some(
+    (booking) => booking.tourId === tourId && booking.status !== "cancelled"
+  );
+
   if (loadingTour) return <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>;
   if (error || !tour) return <div className="p-20 text-center text-red-500 font-bold">{error || "Tour không tồn tại"}</div>;
 
@@ -88,19 +118,8 @@ export default function TourDetailPage() {
   return (
     <div className="min-h-screen bg-white font-sans text-slate-900">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="w-9 h-9 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-lg shadow-sky-200 transition-transform group-hover:scale-105">
-              <span className="font-bold text-xs">DL</span>
-            </div>
-            <span className="text-lg font-bold tracking-tight">Du Lịch Việt</span>
-          </Link>
-          <Link href="/tours" className="text-sm font-medium text-slate-500 hover:text-sky-600 transition">
-            ← Quay lại khám phá
-          </Link>
-        </div>
-      </header>
+      
+      <Header></Header>
 
       <main className="max-w-7xl mx-auto px-6 py-10">
         {/* Gallery Section */}
@@ -180,45 +199,46 @@ export default function TourDetailPage() {
 
             <hr className="my-10 border-slate-100" />
 
-            {/* REVIEWS SECTION - ĐÃ THÊM LẠI VÀ OPTIMIZE */}
+             {/* REVIEW FORM SECTION */}
             <section className="mb-10">
-              <div className="flex items-center justify-between mb-8">
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  Đánh giá từ khách hàng 
-                  <span className="text-sky-600 bg-sky-50 px-2 py-1 rounded-lg text-sm ml-2">★ 4.8</span>
-                </h2>
-                <button className="text-sm font-bold text-sky-600 hover:underline">Xem tất cả</button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[
-                  { name: "Hoàng Nam", rating: 5, comment: "Chuyến du lịch tuyệt vời, hướng dẫn viên rất nhiệt tình và am hiểu kiến thức địa phương!", time: "2 ngày trước", avatar: "N" },
-                  { name: "Trần Thu Hà", rating: 5, comment: "Cảnh đẹp tuyệt vời, dịch vụ từ xe đưa đón đến khách sạn đều rất chuyên nghiệp. Rất đáng tiền.", time: "1 tuần trước", avatar: "H" },
-                  { name: "Nguyễn Văn B", rating: 4, comment: "Tour tốt, lịch trình hơi dày một chút nhưng bù lại đi được nhiều điểm đẹp. Sẽ quay lại.", time: "2 tuần trước", avatar: "B" },
-                  { name: "Minh Anh", rating: 5, comment: "Gia đình mình đã có một kỳ nghỉ rất vui. Cảm ơn đội ngũ tổ chức tour nhiều nhé!", time: "1 tháng trước", avatar: "A" },
-                ].map((review, idx) => (
-                  <div key={idx} className="p-6 rounded-2xl border border-slate-100 bg-slate-50/30 transition-all duration-300 hover:bg-white hover:shadow-xl hover:shadow-slate-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white font-bold text-xs">
-                          {review.avatar}
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-900 text-sm">{review.name}</p>
-                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{review.time}</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-0.5 text-xs">
-                        {[...Array(5)].map((_, i) => (
-                          <span key={i} className={i < review.rating ? "text-yellow-400" : "text-slate-200"}>★</span>
-                        ))}
-                      </div>
-                    </div>
-                    <p className="text-slate-600 text-sm leading-relaxed font-light italic">"{review.comment}"</p>
-                  </div>
-                ))}
-              </div>
+              {/* <h2 className="text-2xl font-bold mb-6">Chia sẻ đánh giá của bạn</h2> */}
+              {!currentUser ? (
+                <div className="p-6 bg-blue-50 border border-blue-200 rounded-xl text-center">
+                  <p className="text-blue-900 font-medium">
+                    Vui lòng{" "}
+                    <Link href="/login" className="underline hover:text-blue-700 font-bold">
+                      đăng nhập
+                    </Link>{" "}
+                    để gửi đánh giá
+                  </p>
+                </div>
+              ) : loadingBookings ? (
+                <div className="p-6 bg-gray-50 border border-gray-200 rounded-xl text-center text-gray-600">
+                  Đang kiểm tra booking...
+                </div>
+              ) : hasBookedThisTour ? (
+                <ReviewForm
+                  tourId={tour.id}
+                  customerId={currentUser.id || ""}
+                  onSuccess={() => setReviewRefresh((prev) => prev + 1)}
+                />
+              ) : (
+                <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl text-center">
+                  <p className="text-amber-900 font-medium mb-2">📋 Bạn phải đặt tour này trước khi có thể đánh giá</p>
+                  <p className="text-amber-800 text-sm">Hãy hoàn thành đơn đặt tour để chia sẻ trải nghiệm của bạn</p>
+                </div>
+              )}
             </section>
+
+            {/* REVIEWS SECTION */}
+            <section className="mb-10">
+              <h2 className="text-2xl font-bold mb-8">Đánh giá từ khách hàng</h2>
+              <ReviewList tourId={tour.id} refreshTrigger={reviewRefresh} />
+            </section>
+
+            <hr className="my-10 border-slate-100" />
+
+           
           </div>
 
           {/* Right Column: Booking Card */}
