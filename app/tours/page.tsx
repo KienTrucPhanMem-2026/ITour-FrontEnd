@@ -7,6 +7,9 @@ import { getStoredUser, clearStoredUser } from "@/lib/auth";
 import { logoutAPI } from "@/lib/api/auth";
 import type { TourDTO, UserProfile } from "@/types/api";
 import TourCard from "@/components/TourCard";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
+import SearchBar from "@/components/SearchBar";
 
 const TOUR_TYPE_LABELS: Record<string, string> = {
   BEACH: "Biển",
@@ -159,83 +162,63 @@ export default function ToursPage() {
   return (
     <div className="min-h-screen bg-[#F5F8F8]">
       {/* ── Header ── */}
-      <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#0EA5E9] flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+      <Header></Header>
+
+      {/* ── Search Section ── */}
+      <section className="relative bg-slate-900 py-20 overflow-hidden">
+        {/* Background Decor - Tạo hiệu ứng chiều sâu */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute -top-24 -right-24 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl" />
+        </div>
+
+        <div className="relative max-w-5xl mx-auto px-6 text-center">
+          {/* Badge nhỏ phía trên */}
+       
+
+          <div className="flex flex-col items-center text-center justify-center mb-8">
+
+            {/* Badge */}
+            <span className="inline-block px-4 py-1 mb-6 text-[10px] font-bold tracking-[0.2em] text-sky-400 uppercase border border-sky-400/30 rounded-full bg-sky-400/5">
+              Khám phá thế giới
+            </span>
+
+            {/* Title */}
+            <h1 className="text-4xl md:text-5xl font-black text-white mb-4 tracking-tight leading-tight">
+              Tìm kiếm <span className="text-sky-400">hành trình</span> của bạn
+            </h1>
+
+            {/* Paragraph: mx-auto rất quan trọng ở đây vì có max-w-lg */}
+            <p className="text-slate-400 text-sm md:text-base max-w-lg mx-auto mb-10 font-medium">
+              Hơn 500+ tour du lịch khắp Việt Nam đang chờ đón bạn khám phá với ưu đãi tốt nhất.
+            </p>
+
+            {/* Search box: Đảm bảo độ rộng hợp lý */}
+            <div className="w-full max-w-2xl">
+              <SearchBar
+                placeholder="Bạn muốn đến đâu hôm nay?"
+                onSearch={(value) => setSearchTerm(value)}
+                variant="glass"
+              />
             </div>
-            <span className="text-xl font-bold text-gray-900">Du Lịch Việt</span>
-          </Link>
-
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-gray-600">
-            <Link href="/" className="hover:text-[#0EA5E9]">Trang chủ</Link>
-            <Link href="/tours" className="text-[#0EA5E9]">Tour du lịch</Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            {currentUser ? (
-              <>
-                <span className="text-sm text-gray-700 font-medium hidden md:block">
-                  {currentUser.fullName || currentUser.userName}
-                </span>
-                <button onClick={handleLogout}
-                  className="px-4 py-2 border border-gray-200 text-sm font-semibold text-gray-600 rounded-full hover:bg-gray-50">
-                  Đăng xuất
-                </button>
-              </>
+          </div>
+          {/* Result Counter - Tinh tế hơn */}
+          <div className="mt-6 flex items-center justify-center gap-2">
+            {loading ? (
+              <div className="flex gap-1">
+                <div className="w-1.5 h-1.5 bg-sky-500 rounded-full animate-bounce" />
+                <div className="w-1.5 h-1.5 bg-sky-500 rounded-full animate-bounce [animation-delay:0.2s]" />
+                <div className="w-1.5 h-1.5 bg-sky-500 rounded-full animate-bounce [animation-delay:0.4s]" />
+              </div>
             ) : (
-              <>
-                <Link href="/login" className="text-sm font-semibold text-[#0EA5E9]">Đăng nhập</Link>
-                <Link href="/register"
-                  className="px-4 py-2 bg-[#0EA5E9] text-white rounded-full text-sm font-semibold hover:bg-[#0284C7]">
-                  Đăng ký
-                </Link>
-              </>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Kết quả: <span className="text-white">{sorted.length} tour</span> có sẵn
+              </p>
             )}
           </div>
         </div>
-      </header>
 
-      {/* ── Search Section ── */}
-      <section className="bg-gradient-to-r from-sky-500 to-sky-400 text-white py-10">
-        <div className="max-w-5xl mx-auto px-6 text-center">
-
-          {/* Title */}
-          <h1 className="text-3xl md:text-4xl font-semibold mb-3">
-            Tìm kiếm tour du lịch
-          </h1>
-
-          <p className="text-sm text-sky-100 mb-6">
-            Khám phá hàng trăm tour hấp dẫn với giá tốt
-          </p>
-
-          {/* Search box */}
-          <div className="flex items-center bg-white rounded-xl shadow-md overflow-hidden max-w-2xl mx-auto">
-
-            <input
-              type="text"
-              placeholder="Bạn muốn đi đâu?"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-4 py-3 text-gray-800 text-sm outline-none"
-            />
-
-            <button className="px-5 py-3 bg-sky-600 text-white text-sm font-medium hover:bg-sky-700 transition">
-              Tìm kiếm
-            </button>
-          </div>
-
-          {/* Result */}
-          <p className="text-xs text-sky-100 mt-4">
-            {loading ? "Đang tải..." : `Có ${sorted.length} tour phù hợp`}
-          </p>
-
-        </div>
       </section>
 
       <div className="max-w-7xl mx-auto px-6 py-12">
@@ -440,11 +423,7 @@ export default function ToursPage() {
       </div>
 
       {/* ── Footer ── */}
-      <footer className="bg-gray-900 text-gray-300 py-12 mt-12">
-        <div className="max-w-7xl mx-auto px-6 text-center">
-          <p>© 2026 Du Lịch Việt. All rights reserved.</p>
-        </div>
-      </footer>
+      <Footer></Footer>
     </div>
   );
 }
