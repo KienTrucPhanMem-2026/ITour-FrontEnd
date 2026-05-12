@@ -45,12 +45,6 @@ export default function TourDetailPage() {
   const [userBookings, setUserBookings] = useState<any[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
 
-  const images = [
-    "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
-    "https://images.unsplash.com/photo-1493558103817-58b2924bce98",
-    "https://images.unsplash.com/photo-1501785888041-af3ef285b470",
-  ];
-
   useEffect(() => {
     const user = getStoredUser();
     setCurrentUser(user);
@@ -65,12 +59,23 @@ export default function TourDetailPage() {
       setLoadingTour(true);
       const tourData = await getTourByIdAPI(id);
       setTour(tourData);
+      // Reset selected image when tour changes
+      setSelectedImage(0);
     } catch {
       setError("Không thể tải thông tin tour.");
     } finally {
       setLoadingTour(false);
     }
   };
+
+  // Use tour images if available, otherwise use placeholder
+  const images = tour?.images && tour.images.length > 0 
+    ? tour.images 
+    : [
+        "https://images.unsplash.com/photo-1507525428034-b723cf961d3e",
+        "https://images.unsplash.com/photo-1493558103817-58b2924bce98",
+        "https://images.unsplash.com/photo-1501785888041-af3ef285b470",
+      ];
 
   const fetchUserBookings = async (customerId: string) => {
     try {
@@ -198,6 +203,65 @@ export default function TourDetailPage() {
             </section>
 
             <hr className="my-10 border-slate-100" />
+
+            {/* Itinerary Section */}
+            {tour.itinerary && tour.itinerary.length > 0 && (
+              <>
+                <section className="mb-12">
+                  <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+                    🗺️ Lịch trình chi tiết
+                  </h2>
+                  <div className="space-y-6">
+                    {tour.itinerary.map((location, index) => (
+                      <div
+                        key={location.id}
+                        className="relative flex gap-6 pb-8 last:pb-0"
+                      >
+                        {/* Timeline line */}
+                        {index < tour.itinerary!.length - 1 && (
+                          <div className="absolute left-6 top-16 bottom-0 w-1 bg-gradient-to-b from-sky-300 to-slate-200"></div>
+                        )}
+                        
+                        {/* Timeline dot */}
+                        <div className="relative flex-shrink-0">
+                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                            {location.visitOrder || index + 1}
+                          </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 pt-2">
+                          <div className="bg-gradient-to-br from-sky-50 to-slate-50 rounded-2xl p-6 border border-sky-100 hover:border-sky-300 transition-all">
+                            <div className="flex items-start justify-between mb-3">
+                              <div>
+                                <h3 className="text-xl font-bold text-slate-900 mb-1">
+                                  📍 {location.locationName || "Điểm đến"}
+                                </h3>
+                                {location.days && (
+                                  <p className="text-sm text-slate-500 font-medium">
+                                    ⏱️ {location.days} ngày tại địa điểm
+                                  </p>
+                                )}
+                              </div>
+                              <span className="px-3 py-1 bg-sky-100 text-sky-700 text-xs font-bold rounded-full uppercase">
+                                Ngày {location.visitOrder || index + 1}
+                              </span>
+                            </div>
+                            {location.note && (
+                              <p className="text-slate-700 text-sm leading-relaxed mt-4 p-4 bg-white rounded-xl border border-slate-100">
+                                {location.note}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <hr className="my-10 border-slate-100" />
+              </>
+            )}
 
              {/* REVIEW FORM SECTION */}
             <section className="mb-10">
