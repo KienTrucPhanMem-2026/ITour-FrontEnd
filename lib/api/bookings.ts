@@ -33,3 +33,18 @@ export async function createBookingAPI(
   });
   return res.data;
 }
+
+/**
+ * POST /api/bookings/{id}/cancel — Hủy booking
+ */
+export async function cancelBookingAPI(
+  bookingId: string
+): Promise<BookingResponseDTO> {
+  const res = await apiFetch<ApiResponse<BookingResponseDTO>>(
+    `/bookings/${bookingId}/cancel`,
+    {
+      method: "POST",
+    }
+  );
+  return res.data;
+}

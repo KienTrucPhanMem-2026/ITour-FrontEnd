@@ -54,7 +54,6 @@ export async function apiFetch<T>(
   }
 
   let body: unknown;
-  console.log("haha");
 
   try {
     body = await res.json();

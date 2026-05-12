@@ -27,6 +27,15 @@ export interface UserProfile {
   email: string;
   address?: string;
   dateOfBirth?: string;
+  point?: number; // Add point support for Customer view
+  createdAt?: string;
+}
+
+export interface UpdateProfileRequest {
+  fullName?: string;
+  phone?: string;
+  address?: string;
+  dateOfBirth?: string; // yyyy-MM-dd
 }
 
 /** Wrapper chung cho mọi response */
@@ -39,6 +48,14 @@ export interface ApiResponse<T> {
 }
 
 // ---------- Tour ----------
+export interface TourLocationDTO {
+  id: string;
+  locationName?: string;       // Location name
+  visitOrder?: number;         // Day 1, Day 2, etc
+  days?: number;               // How many days at this location
+  note?: string;               // Description/activities
+}
+
 export interface TourDTO {
   id: string;
   name: string;
@@ -55,12 +72,13 @@ export interface TourDTO {
   status?: string;
   createdAt?: string;
   updatedAt?: string;
-  schedules?: TourScheduleDTO[];  // Tour schedules from backend
-  startDestinationName?: string;  // Location name for filter
-  endDestinationName?: string;    // Location name for filter
-  availableSlots?: number;        // Available slots
-  vehicleType?: string;     
-  images: []      // Vehicle type
+  schedules?: TourScheduleDTO[];     // Tour schedules from backend
+  startDestinationName?: string;     // Location name for filter
+  endDestinationName?: string;       // Location name for filter
+  availableSlots?: number;           // Available slots
+  vehicleType?: string;              // Vehicle type
+  images?: string[];                 // Tour images URLs
+  itinerary?: TourLocationDTO[];     // Tour itinerary (day 1, 2, 3 locations)
 }
 
 // ---------- TourSchedule ----------
@@ -111,4 +129,18 @@ export interface BookingResponseDTO {
   pointEarned?: number;
   customerTotalPoint?: number;
   message?: string;
+}
+
+// ---------- MoMo Payment ----------
+export interface MomoCreatePaymentResponse {
+  partnerCode: string;
+  requestId: string;
+  orderId: string;
+  amount: number;
+  responseTime: number;
+  message: string;
+  resultCode: number;
+  payUrl: string;
+  deeplink?: string;
+  qrCodeUrl?: string;
 }

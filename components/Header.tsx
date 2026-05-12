@@ -66,7 +66,7 @@ export default function Header() {
           {currentUser ? (
             <>
               <Link
-                href="/dashboard"
+                href="/profile"
                 className="hidden md:flex items-center gap-2 text-sm text-gray-700 hover:text-[#0EA5E9]"
               >
                 <div className="w-8 h-8 rounded-full bg-[#0EA5E9] flex items-center justify-center text-white font-bold text-xs">
