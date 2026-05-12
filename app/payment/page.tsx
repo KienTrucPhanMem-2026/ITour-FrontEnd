@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBookingAPI } from "@/lib/api/bookings";
+import { createMomoPaymentAPI } from "@/lib/api/payment";
 import { getTourByIdAPI } from "@/lib/api/tours";
 import { useCurrentUser } from "@/hooks/useAuth";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
@@ -105,18 +106,33 @@ function PaymentContent() {
 
     setLoading(true);
     try {
-      const result = await createBookingAPI({
-        customerId: currentUser.id,   // dùng userId làm customerId
+      const bookingRequest = {
+        customerId: currentUser.id,
         tourId: tour.id,
         tourScheduleId: scheduleId,
         adults,
         children,
         paymentMethod,
-      });
+      };
 
-      // Lưu kết quả tạm để trang confirmation dùng
-      sessionStorage.setItem("lastBooking", JSON.stringify(result));
-      router.push(`/payment/confirmation?bookingId=${result.bookingId}`);
+      if (paymentMethod === "MOMO") {
+        // MoMo payment flow: create booking + payment in one call
+        const momoResponse = await createMomoPaymentAPI(bookingRequest);
+        
+        if (momoResponse.resultCode === 0 && momoResponse.payUrl) {
+          // Redirect to MoMo payment page
+          window.location.href = momoResponse.payUrl;
+        } else {
+          setApiError("Không thể tạo liên kết thanh toán MoMo. Vui lòng thử lại.");
+        }
+      } else {
+        // Other payment methods: create booking + redirect to confirmation
+        const result = await createBookingAPI(bookingRequest);
+        
+        // Lưu kết quả tạm để trang confirmation dùng
+        sessionStorage.setItem("lastBooking", JSON.stringify(result));
+        router.push(`/payment/confirmation?bookingId=${result.bookingId}`);
+      }
     } catch (err) {
       if (err instanceof ApiError) {
         setApiError(err.message);
