@@ -21,7 +21,13 @@ export default function DashboardPage() {
     // Load user data từ localStorage
     const storedUser = getStoredUser();
     if (storedUser) {
-      setUser(storedUser);
+      setUser({
+        id: storedUser.id,
+        name: storedUser.fullName || storedUser.userName || "",
+        email: storedUser.email,
+        phone: storedUser.phone,
+        address: storedUser.address,
+      });
     }
 
     // Load mock bookings
