@@ -126,6 +126,10 @@ export interface BookingResponseDTO {
   status: string;
   paymentStatus?: string;
   bookingDate?: string;
+  /** Thời điểm hết hạn giữ chỗ (ISO string, 15 phút sau khi tạo) */
+  expireAt?: string;
+  /** Link thanh toán MoMo — null nếu consumer chưa xử lý xong */
+  paymentUrl?: string | null;
   pointEarned?: number;
   customerTotalPoint?: number;
   message?: string;

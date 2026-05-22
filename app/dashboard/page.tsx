@@ -1,24 +1,234 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { User, Booking } from "@/lib/mockData";
-import { mockBookings } from "@/lib/mockData";
 import { getStoredUser, clearStoredUser } from "@/lib/auth";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
+import { getMyBookingsAPI, getBookingPaymentUrlAPI } from "@/lib/api/bookings";
+import { useBookingTimer } from "@/hooks/useBookingTimer";
+import type { BookingResponseDTO } from "@/types/api";
 
+// ─── Sub-component: một booking card với countdown timer ───────────────────
+function BookingCard({ booking }: { booking: BookingResponseDTO }) {
+  const isPending = booking.status === "PENDING";
+  const isPaid = booking.status === "PAID" || booking.paymentStatus === "PAID";
+  const isCancelled = booking.status === "CANCELLED";
+
+  const [currentPaymentUrl, setCurrentPaymentUrl] = useState<string | null>(
+    booking.paymentUrl || null
+  );
+
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const { formattedTime, isExpired, progressPercent } = useBookingTimer(
+    isPending ? booking.expireAt : null
+  );
+
+  useEffect(() => {
+    if (!isPending || currentPaymentUrl || isExpired) {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      return;
+    }
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const data = await getBookingPaymentUrlAPI(booking.bookingId);
+        if (data.paymentUrl) {
+          setCurrentPaymentUrl(data.paymentUrl);
+          if (pollingRef.current) clearInterval(pollingRef.current);
+        }
+      } catch (err) {
+        // ignore errors silently
+      }
+    }, 2000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [isPending, currentPaymentUrl, isExpired, booking.bookingId]);
+
+  const handlePayNow = () => {
+    if (currentPaymentUrl) window.location.href = currentPaymentUrl;
+  };
+
+  const statusBadge = () => {
+    if (isPaid)
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">
+          ✅ Đã thanh toán
+        </span>
+      );
+    if (isCancelled || (isPending && isExpired))
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-red-100 text-red-700">
+          ❌ Đã hủy
+        </span>
+      );
+    if (isPending)
+      return (
+        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-amber-100 text-amber-700">
+          ⏳ Chờ thanh toán
+        </span>
+      );
+    return (
+      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-semibold bg-gray-100 text-gray-600">
+        {booking.status}
+      </span>
+    );
+  };
+
+  return (
+    <div
+      className={`bg-white rounded-2xl shadow-md hover:shadow-lg transition-all border ${
+        isPending && !isExpired
+          ? "border-amber-200"
+          : isCancelled || (isPending && isExpired)
+          ? "border-red-100"
+          : isPaid
+          ? "border-green-100"
+          : "border-gray-100"
+      }`}
+    >
+      <div className="p-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-0.5 rounded">
+                {booking.bookingId}
+              </span>
+              {statusBadge()}
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 truncate mt-1">
+              {booking.tourName || "—"}
+            </h3>
+            <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600">
+              <span>👤 {booking.adults} người lớn</span>
+              {(booking.children ?? 0) > 0 && (
+                <span>👦 {booking.children} trẻ em</span>
+              )}
+              {booking.bookingDate && (
+                <span>
+                  🗓️{" "}
+                  {new Date(booking.bookingDate).toLocaleDateString("vi-VN")}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="text-right shrink-0">
+            <div className="text-2xl font-bold text-[#0EA5E9]">
+              {booking.finalPrice
+                ? `${(booking.finalPrice / 1_000_000).toFixed(1)}M₫`
+                : "—"}
+            </div>
+            {booking.paymentMethod && (
+              <div className="text-xs text-gray-400 mt-1">
+                {booking.paymentMethod}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Countdown + Pay button cho PENDING booking chưa hết hạn */}
+        {isPending && !isExpired && (
+          <div className="mt-4 p-4 bg-amber-50 rounded-xl border border-amber-100">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex-1">
+                <p className="text-xs text-amber-600 font-semibold mb-1">
+                  ⏰ Thời gian giữ chỗ còn lại
+                </p>
+                <div
+                  className={`text-3xl font-mono font-bold tabular-nums ${
+                    progressPercent > 80
+                      ? "text-red-600"
+                      : progressPercent > 50
+                      ? "text-orange-500"
+                      : "text-amber-700"
+                  }`}
+                >
+                  {formattedTime}
+                </div>
+                {/* Progress bar */}
+                <div className="mt-2 h-1.5 bg-amber-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-1000 ${
+                      progressPercent > 80
+                        ? "bg-red-400"
+                        : progressPercent > 50
+                        ? "bg-orange-400"
+                        : "bg-amber-400"
+                    }`}
+                    style={{ width: `${100 - progressPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {currentPaymentUrl ? (
+                <button
+                  onClick={handlePayNow}
+                  className="px-5 py-2.5 bg-gradient-to-r from-[#0EA5E9] to-[#6366F1] text-white font-bold rounded-xl shadow hover:shadow-md transition-all hover:scale-[1.02] whitespace-nowrap"
+                >
+                  💳 Thanh toán ngay
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="px-5 py-2.5 bg-gray-200 text-gray-500 font-bold rounded-xl cursor-not-allowed flex items-center gap-2 whitespace-nowrap"
+                >
+                  <div className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                  Đang tạo link...
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Expired notice */}
+        {isPending && isExpired && (
+          <div className="mt-4 p-3 bg-red-50 rounded-xl border border-red-100">
+            <p className="text-sm text-red-600 font-medium">
+              ⚠️ Đã hủy do hết hạn thanh toán
+            </p>
+          </div>
+        )}
+
+        {/* Paid success badge */}
+        {isPaid && (
+          <div className="mt-4 p-3 bg-green-50 rounded-xl border border-green-100 flex items-center gap-2">
+            <span className="text-green-600 text-sm font-medium">
+              🎉 Đặt tour thành công! Email xác nhận đã được gửi.
+            </span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Dashboard Page ──────────────────────────────────────────────────────
 export default function DashboardPage() {
   const router = useRouter();
-  const isReady = useProtectedRoute(); // Bảo vệ trang - redirect nếu chưa login
-  const [user, setUser] = useState<User | null>(null);
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const isReady = useProtectedRoute();
   const [activeTab, setActiveTab] = useState<"overview" | "bookings" | "profile">(
     "overview"
   );
 
+  // User info
+  const [user, setUser] = useState<{
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    point?: number;
+  } | null>(null);
+
+  // Bookings từ API
+  const [bookings, setBookings] = useState<BookingResponseDTO[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(false);
+
   useEffect(() => {
-    // Load user data từ localStorage
     const storedUser = getStoredUser();
     if (storedUser) {
       setUser({
@@ -27,12 +237,20 @@ export default function DashboardPage() {
         email: storedUser.email,
         phone: storedUser.phone,
         address: storedUser.address,
+        point: (storedUser as { point?: number }).point ?? 0,
       });
     }
-
-    // Load mock bookings
-    setBookings(mockBookings.filter((b) => b.userId === "user-1"));
   }, []);
+
+  // Tải bookings khi switch sang tab "bookings"
+  useEffect(() => {
+    if (activeTab !== "bookings" || !user) return;
+    setLoadingBookings(true);
+    getMyBookingsAPI(user.id)
+      .then(setBookings)
+      .catch(() => setBookings([]))
+      .finally(() => setLoadingBookings(false));
+  }, [activeTab, user]);
 
   const handleLogout = () => {
     clearStoredUser();
@@ -50,9 +268,11 @@ export default function DashboardPage() {
     );
   }
 
-  const totalSpent = bookings.reduce((sum, b) => sum + b.totalPrice, 0);
-  const confirmedBookings = bookings.filter((b) => b.status === "confirmed").length;
-  const pendingBookings = bookings.filter((b) => b.status === "pending").length;
+  const paidCount = bookings.filter((b) => b.status === "PAID").length;
+  const pendingCount = bookings.filter((b) => b.status === "PENDING").length;
+  const totalSpent = bookings
+    .filter((b) => b.status === "PAID")
+    .reduce((sum, b) => sum + (b.finalPrice ?? 0), 0);
 
   return (
     <div className="min-h-screen bg-[#F5F8F8]">
@@ -61,23 +281,13 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-full bg-[#0EA5E9] flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
             <span className="text-xl font-bold text-gray-900">Du Lịch Việt</span>
           </Link>
-
           <div className="flex items-center gap-4">
             <Link href="/tours" className="text-sm font-medium text-gray-600 hover:text-[#0EA5E9]">
               Khám Phá Tours
@@ -97,89 +307,69 @@ export default function DashboardPage() {
         {/* ── User Header ── */}
         <div className="bg-white rounded-2xl p-8 shadow-md mb-8 flex items-center gap-6">
           <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#0EA5E9] to-[#38BDF8] flex items-center justify-center text-white text-3xl font-bold">
-            {user.name.charAt(0)}
+            {user.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{user.name}</h1>
             <p className="text-gray-600">{user.email}</p>
-            <p className="text-sm text-gray-500">{user.phone}</p>
+            {user.phone && <p className="text-sm text-gray-500">{user.phone}</p>}
+            {(user.point ?? 0) > 0 && (
+              <p className="text-sm font-semibold text-[#0EA5E9] mt-1">
+                ⭐ {user.point?.toLocaleString("vi-VN")} điểm tích lũy
+              </p>
+            )}
           </div>
         </div>
 
         {/* ── Tabs ── */}
         <div className="flex gap-4 mb-8 border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`px-6 py-3 font-semibold border-b-2 transition ${
-              activeTab === "overview"
-                ? "border-[#0EA5E9] text-[#0EA5E9]"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Tổng Quan
-          </button>
-          <button
-            onClick={() => setActiveTab("bookings")}
-            className={`px-6 py-3 font-semibold border-b-2 transition ${
-              activeTab === "bookings"
-                ? "border-[#0EA5E9] text-[#0EA5E9]"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Đơn Đặt Tours ({bookings.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("profile")}
-            className={`px-6 py-3 font-semibold border-b-2 transition ${
-              activeTab === "profile"
-                ? "border-[#0EA5E9] text-[#0EA5E9]"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            Thông Tin Cá Nhân
-          </button>
+          {(
+            [
+              { key: "overview", label: "Tổng Quan" },
+              { key: "bookings", label: `Đơn Đặt Tours${bookings.length > 0 ? ` (${bookings.length})` : ""}` },
+              { key: "profile", label: "Thông Tin Cá Nhân" },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-6 py-3 font-semibold border-b-2 transition ${
+                activeTab === tab.key
+                  ? "border-[#0EA5E9] text-[#0EA5E9]"
+                  : "border-transparent text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* ── Tab Content ── */}
+        {/* ── Tab: Tổng Quan ── */}
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-2xl p-6 shadow-md">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-gray-600 font-semibold">Đơn Đã Đặt</h3>
-                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" />
-                  </svg>
-                </div>
+                <h3 className="text-gray-600 font-semibold">Đã Thanh Toán</h3>
+                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-600 text-xl">✅</div>
               </div>
-              <p className="text-4xl font-bold text-gray-900">{bookings.length}</p>
-              <p className="text-sm text-gray-500 mt-2">tổng cộng</p>
+              <p className="text-4xl font-bold text-gray-900">{paidCount}</p>
+              <p className="text-sm text-gray-500 mt-2">đơn thành công</p>
             </div>
-
             <div className="bg-white rounded-2xl p-6 shadow-md">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-gray-600 font-semibold">Đơn Đã Xác Nhận</h3>
-                <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                </div>
+                <h3 className="text-gray-600 font-semibold">Chờ Thanh Toán</h3>
+                <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 text-xl">⏳</div>
               </div>
-              <p className="text-4xl font-bold text-gray-900">{confirmedBookings}</p>
-              <p className="text-sm text-gray-500 mt-2">sắp tới</p>
+              <p className="text-4xl font-bold text-gray-900">{pendingCount}</p>
+              <p className="text-sm text-gray-500 mt-2">đơn đang chờ</p>
             </div>
-
             <div className="bg-white rounded-2xl p-6 shadow-md">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-gray-600 font-semibold">Tổng Chi Tiêu</h3>
-                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-orange-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M8.16 5.314l4.897-1.596A1 1 0 0114.803 4.9l4.401 14.653a1 1 0 01-1.282 1.278l-4.897-1.596.5 6.428a1 1 0 11-1.998.066L10.5 20.9l-1.5 1.5a1 1 0 01-1.414-1.414l1.5-1.5-1.503-19.228a1 1 0 011.582-1.031z" />
-                  </svg>
-                </div>
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl">💰</div>
               </div>
               <p className="text-4xl font-bold text-gray-900">
-                {(totalSpent / 1000000).toFixed(1)}M₫
+                {(totalSpent / 1_000_000).toFixed(1)}M₫
               </p>
               <p className="text-sm text-gray-500 mt-2">đã chi tiêu</p>
             </div>
@@ -194,62 +384,33 @@ export default function DashboardPage() {
                 >
                   Đặt Tour Mới
                 </Link>
-                <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-full font-semibold hover:bg-gray-50 transition-colors">
-                  Xem Yêu Thích
-                </button>
-                <button className="px-6 py-2 border border-gray-300 text-gray-700 rounded-full font-semibold hover:bg-gray-50 transition-colors">
-                  Liên Hệ Hỗ Trợ
+                <button
+                  onClick={() => setActiveTab("bookings")}
+                  className="px-6 py-2 border border-gray-300 text-gray-700 rounded-full font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Xem Đơn Đặt
                 </button>
               </div>
             </div>
           </div>
         )}
 
+        {/* ── Tab: Đơn Đặt Tours ── */}
         {activeTab === "bookings" && (
           <div>
-            {bookings.length > 0 ? (
+            {loadingBookings ? (
+              <div className="flex justify-center py-16">
+                <div className="w-10 h-10 border-4 border-[#0EA5E9] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : bookings.length > 0 ? (
               <div className="space-y-4">
                 {bookings.map((booking) => (
-                  <div
-                    key={booking.id}
-                    className="bg-white rounded-2xl p-6 shadow-md hover:shadow-lg transition"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900">
-                          {booking.tourTitle}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          📅 Ngày khởi hành: {new Date(booking.checkIn).toLocaleDateString("vi-VN")}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          👥 Số người: {booking.participants}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-[#0EA5E9]">
-                          {(booking.totalPrice / 1000000).toFixed(1)}M₫
-                        </div>
-                        <div className={`inline-block mt-2 px-4 py-1 rounded-full text-sm font-semibold ${
-                          booking.status === "confirmed"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}>
-                          {booking.status === "confirmed" ? "✓ Xác nhận" : "⏳ Chờ xác nhận"}
-                        </div>
-                      </div>
-                    </div>
-                    <button className="mt-4 px-4 py-2 border border-[#0EA5E9] text-[#0EA5E9] rounded-lg font-semibold hover:bg-blue-50 transition-colors">
-                      Xem Chi Tiết
-                    </button>
-                  </div>
+                  <BookingCard key={booking.bookingId} booking={booking} />
                 ))}
               </div>
             ) : (
               <div className="bg-white rounded-2xl p-12 text-center shadow-md">
-                <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <div className="text-6xl mb-4">🧳</div>
                 <p className="text-gray-600 text-lg mb-4">
                   Bạn chưa có đơn đặt tour nào
                 </p>
@@ -264,57 +425,37 @@ export default function DashboardPage() {
           </div>
         )}
 
+        {/* ── Tab: Profile ── */}
         {activeTab === "profile" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-md">
               <h3 className="text-lg font-bold text-gray-900 mb-6">Thông Tin Cá Nhân</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Họ và Tên
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={user.name}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
-                  />
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Họ và Tên</label>
+                  <input type="text" defaultValue={user.name}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    defaultValue={user.email}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
-                  />
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Email</label>
+                  <input type="email" defaultValue={user.email}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Số Điện Thoại
-                  </label>
-                  <input
-                    type="tel"
-                    defaultValue={user.phone || ""}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
-                  />
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Số Điện Thoại</label>
+                  <input type="tel" defaultValue={user.phone || ""}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Địa Chỉ
-                  </label>
-                  <input
-                    type="text"
-                    defaultValue={user.address || ""}
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]"
-                  />
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">Địa Chỉ</label>
+                  <input type="text" defaultValue={user.address || ""}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9]" />
                 </div>
                 <button className="w-full px-6 py-2 bg-[#0EA5E9] text-white rounded-lg font-semibold hover:bg-[#0284C7] transition-colors">
                   Lưu Thay Đổi
                 </button>
               </div>
             </div>
-
             <div>
               <div className="bg-white rounded-2xl p-6 shadow-md">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Bảo Mật</h3>

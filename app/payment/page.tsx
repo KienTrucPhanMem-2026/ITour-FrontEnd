@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createBookingAPI } from "@/lib/api/bookings";
-import { createMomoPaymentAPI } from "@/lib/api/payment";
+import { createBookingAPI, getBookingPaymentUrlAPI } from "@/lib/api/bookings";
 import { getTourByIdAPI } from "@/lib/api/tours";
 import { useCurrentUser } from "@/hooks/useAuth";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
+import { useBookingTimer } from "@/hooks/useBookingTimer";
 import { ApiError } from "@/lib/api/config";
-import type { TourDTO, TourScheduleDTO, PaymentMethod } from "@/types/api";
+import type { TourDTO, TourScheduleDTO, PaymentMethod, BookingResponseDTO } from "@/types/api";
 
 function formatPrice(amount: number): string {
   return `${(amount / 1_000_000).toFixed(1)}M₫`;
@@ -37,8 +37,17 @@ function PaymentContent() {
   const [loadingData, setLoadingData] = useState(true);
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("VNPAY");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("MOMO");
 
+  // ── Async booking workflow state ──
+  const [pendingBooking, setPendingBooking] = useState<BookingResponseDTO | null>(null);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
+  const { formattedTime, isExpired, progressPercent } = useBookingTimer(
+    pendingBooking?.expireAt
+  );
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -81,7 +90,36 @@ function PaymentContent() {
     load();
   }, [isReady, tourId, scheduleId]);
 
-  if (!isReady) return null;
+  // ── Polling logic: poll GET /bookings/{id}/payment-url mỗi 2 giây ──
+  useEffect(() => {
+    if (!pendingBooking || paymentUrl || isExpired) {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      return;
+    }
+    setIsPolling(true);
+    pollingRef.current = setInterval(async () => {
+      try {
+        const data = await getBookingPaymentUrlAPI(pendingBooking.bookingId);
+        if (data.paymentUrl) {
+          setPaymentUrl(data.paymentUrl);
+          setIsPolling(false);
+          if (pollingRef.current) clearInterval(pollingRef.current);
+        }
+      } catch {
+        // ignore polling errors silently
+      }
+    }, 2000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [pendingBooking, paymentUrl, isExpired]);
+
+  // ── Auto redirect when paymentUrl is available ──
+  useEffect(() => {
+    if (paymentUrl) {
+      window.location.href = paymentUrl;
+    }
+  }, [paymentUrl]);
 
   // Price calculation
   const unitPrice = schedule?.price ?? tour?.price ?? 0;
@@ -96,6 +134,10 @@ function PaymentContent() {
     if (!formData.phone.match(/^[0-9]{10,20}$/)) errs.phone = "Số điện thoại không hợp lệ";
     setFormErrors(errs);
     return Object.keys(errs).length === 0;
+  };
+
+  const handlePayNow = () => {
+    if (paymentUrl) window.location.href = paymentUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,21 +157,15 @@ function PaymentContent() {
         paymentMethod,
       };
 
+      // Tất cả phương thức đều dùng createBookingAPI — trả về 201 ngay lập tức
+      // Consumer sẽ bất đồng bộ tạo payment URL rồi cập nhập vào DB
+      const result = await createBookingAPI(bookingRequest);
+
       if (paymentMethod === "MOMO") {
-        // MoMo payment flow: create booking + payment in one call
-        const momoResponse = await createMomoPaymentAPI(bookingRequest);
-        
-        if (momoResponse.resultCode === 0 && momoResponse.payUrl) {
-          // Redirect to MoMo payment page
-          window.location.href = momoResponse.payUrl;
-        } else {
-          setApiError("Không thể tạo liên kết thanh toán MoMo. Vui lòng thử lại.");
-        }
+        // Hiển thị màn hình đặt tôr thành công + countdown + chờ payment URL
+        setPendingBooking(result);
       } else {
-        // Other payment methods: create booking + redirect to confirmation
-        const result = await createBookingAPI(bookingRequest);
-        
-        // Lưu kết quả tạm để trang confirmation dùng
+        // Phương thức khác: lưu và chuyển hướng
         sessionStorage.setItem("lastBooking", JSON.stringify(result));
         router.push(`/payment/confirmation?bookingId=${result.bookingId}`);
       }
@@ -145,20 +181,65 @@ function PaymentContent() {
     }
   };
 
-  if (loadingData) {
+  if (!isReady || loadingData || !tour) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#0EA5E9]" />
       </div>
     );
   }
 
-  if (!tour) {
+  // ── Màn hình "Đang chuyển hướng thanh toán" hoặc "Hết hạn" ──
+  if (pendingBooking) {
+    if (isExpired) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-gray-100">
+            <div className="text-6xl mb-4">⏰</div>
+            <h2 className="text-2xl font-bold text-red-600 mb-2">Hết hạn thanh toán!</h2>
+            <p className="text-gray-500 text-sm mb-6">
+              Giao dịch giữ chỗ đã quá hạn 15 phút và bị tự động hủy. Vui lòng đặt lại tour.
+            </p>
+            <Link
+              href={`/tours/${pendingBooking.tourId}`}
+              className="block w-full py-3 bg-[#0EA5E9] hover:bg-[#0284C7] text-white font-bold rounded-xl text-center transition-colors shadow-md hover:shadow-lg"
+            >
+              Đặt lại tour
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <p className="text-gray-600 mb-4">{apiError || "Tour không tìm thấy"}</p>
-          <Link href="/tours" className="text-[#0EA5E9] hover:underline">Quay lại danh sách tour</Link>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8 text-center border border-gray-100">
+          <div className="relative w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+            {/* Spinning gradient border */}
+            <div className="absolute inset-0 rounded-full border-4 border-t-[#D82D8B] border-r-indigo-500 border-b-purple-500 border-l-pink-300 animate-spin" />
+            {/* Inner icon/logo container */}
+            <div className="w-16 h-16 bg-[#D82D8B] rounded-2xl flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xl">MoMo</span>
+            </div>
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Đang kết nối đến MoMo...</h2>
+          <p className="text-gray-500 text-sm mb-6">
+            Hệ thống đang chuẩn bị giao dịch và tạo liên kết thanh toán an toàn cho tour:
+          </p>
+          <div className="bg-gray-50 rounded-2xl p-4 mb-6 border border-gray-100 text-left">
+            <span className="text-xs font-semibold text-gray-400 uppercase">Tên Tour</span>
+            <p className="text-gray-800 font-bold line-clamp-2 mt-0.5">{pendingBooking.tourName || tour?.name}</p>
+            <div className="flex justify-between items-center mt-3 pt-3 border-t border-gray-200/60">
+              <span className="text-sm font-semibold text-gray-500">Tổng tiền</span>
+              <span className="text-lg font-extrabold text-[#D82D8B]">
+                {pendingBooking.finalPrice ? formatPrice(pendingBooking.finalPrice) : "—"}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-2 text-sm text-gray-400">
+            <div className="w-2 h-2 rounded-full bg-[#D82D8B] animate-ping" />
+            <span>Vui lòng không đóng trình duyệt hoặc tải lại trang</span>
+          </div>
         </div>
       </div>
     );

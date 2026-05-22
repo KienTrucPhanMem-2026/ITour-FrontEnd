@@ -48,3 +48,18 @@ export async function cancelBookingAPI(
   );
   return res.data;
 }
+
+/**
+ * GET /api/bookings/{id}/payment-url
+ * Lấy payment URL của booking (có thể null nếu consumer chưa xử lý xong).
+ * Frontend nên poll API này mỗi 2 giây cho đến khi có URL.
+ */
+export async function getBookingPaymentUrlAPI(
+  bookingId: string
+): Promise<BookingResponseDTO> {
+  const res = await apiFetch<ApiResponse<BookingResponseDTO>>(
+    `/bookings/${bookingId}/payment-url`,
+    { method: "GET" }
+  );
+  return res.data;
+}
