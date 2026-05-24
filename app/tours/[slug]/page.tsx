@@ -348,6 +348,21 @@ export default function TourDetailPage() {
               >
                 {selectedScheduleId ? "Đặt hành trình ngay" : "Chọn ngày khởi hành"}
               </button>
+
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("open-chat-tour", {
+                    detail: {
+                      tourId: tour.id,
+                      tourName: tour.name,
+                      tourPrice: tour.price
+                    }
+                  }));
+                }}
+                className="w-full py-3.5 bg-sky-50 hover:bg-sky-100 text-sky-600 font-bold rounded-2xl active:scale-[0.98] transition-all mb-4 text-sm tracking-wide flex items-center justify-center gap-2 border border-sky-100 shadow-sm cursor-pointer"
+              >
+                💬 Nhận tư vấn về tour này
+              </button>
               
               <button className="w-full py-3 text-slate-400 font-bold text-xs hover:text-rose-500 transition-colors uppercase tracking-widest">
                 ♥ Lưu vào mục yêu thích
