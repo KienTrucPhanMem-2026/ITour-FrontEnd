@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Providers } from "./providers";
 import "./globals.css";
 
+import ChatWidget from "@/components/ChatWidget";
+
 export default function RootLayout({
   children,
 }: {
@@ -29,7 +31,10 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className="bg-[#F5F8F8]">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <ChatWidget />
+        </Providers>
       </body>
     </html>
   );
