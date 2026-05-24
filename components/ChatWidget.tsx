@@ -964,9 +964,9 @@ export default function ChatWidget({
                                 </div>
                               ) : (
                                 <div
-                                  className={`px-3 py-2 text-xs shadow-sm bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] ${
+                                  className={`px-3 py-2 text-xs shadow-sm ${
                                     isMe
-                                      ? "text-white rounded-2xl rounded-tr-none"
+                                      ? "bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] text-white rounded-2xl rounded-tr-none"
                                       : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-tl-none"
                                   }`}
                                 >
