@@ -58,6 +58,11 @@ export default function ChatWidget({
   const [showPreChatForm, setShowPreChatForm] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [tourContext, setTourContext] = useState<{
+    tourId: string;
+    tourName: string;
+    tourPrice: string | number;
+  } | null>(null);
 
   // --- Form States ---
   const [fullName, setFullName] = useState("");
@@ -81,6 +86,14 @@ export default function ChatWidget({
 
   // --- Initial Phase: Load Existing Session ---
   const loadActiveSession = (force = false) => {
+    if (localStorage.getItem("chatSessionReset") === "true" && !force) {
+      setChatCustomer(null);
+      setConversation(null);
+      setMessages([]);
+      setShowPreChatForm(true);
+      return;
+    }
+
     if (loading && !force) return;
     if (conversation && !force) return;
 
@@ -155,16 +168,25 @@ export default function ChatWidget({
   useEffect(() => {
     if (!conversation) return;
 
-    // Connect socket if not connected
+    // Set auth parameters before connecting so the /customer namespace identifies this client
+    const customerId = chatCustomer?.id || conversation.chatCustomer?.id;
+    if (customerId) {
+      socket.auth = { customerId };
+    }
+
+    // Force connect or reconnect if auth details changed
     if (!socket.connected) {
-      // Set auth before connecting so the /customer namespace identifies this client
-      socket.auth = { customerId: chatCustomer?.id || conversation.chatCustomer?.id || 'anonymous' };
       socket.connect();
     }
 
     setIsConnected(socket.connected);
 
-    const onConnect = () => setIsConnected(true);
+    const onConnect = () => {
+      setIsConnected(true);
+      console.log(`⚡ [CUSTOMER] Socket connected, joining room ${conversation.id}`);
+      socket.emit("join-conversation", { conversationId: conversation.id });
+    };
+
     const onDisconnect = () => setIsConnected(false);
 
     // 1. Listen for new real-time messages
@@ -189,19 +211,30 @@ export default function ChatWidget({
       }
     };
 
+    const onStatusUpdated = (data: { conversationId: string; status: string }) => {
+      console.log("📢 [CUSTOMER] Conversation status updated", data);
+      if (data.conversationId === conversation.id) {
+        setConversation((prev) => prev ? { ...prev, status: data.status as any } : null);
+      }
+    };
+
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
     socket.on("receive-message", onReceiveMessage);
+    socket.on("conversation-status-updated", onStatusUpdated);
 
-    // Join room
-    socket.emit("join-conversation", { conversationId: conversation.id });
+    // If socket is already connected, join the room immediately
+    if (socket.connected) {
+      onConnect();
+    }
 
     return () => {
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
       socket.off("receive-message", onReceiveMessage);
+      socket.off("conversation-status-updated", onStatusUpdated);
     };
-  }, [conversation]);
+  }, [conversation, chatCustomer]);
 
   // --- Logic API Functions ---
 
@@ -212,7 +245,11 @@ export default function ChatWidget({
     fullName: string;
     email?: string;
     phone?: string;
+    tourId?: string;
   }) => {
+    // Clear explicit reset flag since we are now starting a conversation
+    localStorage.removeItem("chatSessionReset");
+
     setLoading(true);
     try {
       // Generate standard session ID for guests
@@ -226,7 +263,7 @@ export default function ChatWidget({
         fullName: payload.fullName,
         email: payload.email,
         phone: payload.phone,
-        tourId: currentTourId,
+        tourId: payload.tourId || tourContext?.tourId || currentTourId,
       };
 
       const res = await apiFetch<Conversation>("/conversations", {
@@ -336,27 +373,40 @@ export default function ChatWidget({
     }
   };
 
-  const sendTourLinkContext = async () => {
-    if (!conversation || !chatCustomer || !currentTourId) return;
+  const sendTourLinkContext = async (tourId?: string, tourName?: string, tourPrice?: string | number) => {
+    const tId = tourId || currentTourId || tourContext?.tourId;
+    const tName = tourName || currentTourName || tourContext?.tourName;
+    const tPrice = tourPrice || currentTourPrice || tourContext?.tourPrice;
 
-    const tourLinkMessage: Message = {
-      conversationId: conversation.id,
-      senderType: "CUSTOMER",
-      senderId: chatCustomer.id,
-      chatCustomerId: chatCustomer.id,
-      customerId: chatCustomer.id, // For REST API backward compatibility
-      content: `Tôi đang quan tâm tới Tour: *${currentTourName}* (${currentTourPrice} VND). Bạn tư vấn giúp tôi nhé!`,
-      messageType: "TOUR_LINK",
-    } as any;
+    if (!conversation || !chatCustomer || !tId) return;
+
+    const contentText = `[TOUR_LINK:tourId=${tId}&name=${tName}&price=${tPrice}]`;
 
     try {
-      socket.emit("send_message", tourLinkMessage);
+      if (socket.connected) {
+        socket.emit("send-message", {
+          conversationId: conversation.id,
+          text: contentText,
+          senderType: "CUSTOMER",
+          customerId: chatCustomer.id,
+        });
+      }
+      
       const savedMsg = await apiFetch<Message>("/messages", {
         method: "POST",
-        body: JSON.stringify(tourLinkMessage),
+        body: JSON.stringify({
+          conversationId: conversation.id,
+          senderType: "CUSTOMER",
+          chatCustomerId: chatCustomer.id,
+          text: contentText,
+          content: contentText,
+          messageType: "TOUR_LINK",
+          isActive: true,
+          isRead: false,
+        }),
       });
       if (savedMsg) {
-        setMessages((prev) => [...prev, savedMsg]);
+        setMessages((prev) => [...prev, { ...savedMsg, content: savedMsg.content || contentText }]);
         scrollToBottom();
       }
     } catch (e) {
@@ -364,16 +414,96 @@ export default function ChatWidget({
     }
   };
 
-  const handleResetSession = () => {
+  const handleStartNewChat = () => {
+    localStorage.removeItem("chatSessionReset");
     localStorage.removeItem("chatCustomer");
     setChatCustomer(null);
     setConversation(null);
     setMessages([]);
+    setTourContext(null);
     setShowPreChatForm(true);
     if (socket.connected) {
       socket.disconnect();
     }
   };
+
+  const handleResetSession = () => {
+    if (conversation) {
+      // Direct REST API to close conversation in Backend
+      apiFetch(`/conversations/${conversation.id}/close`, {
+        method: "POST",
+      }).catch(console.error);
+
+      // Emit close-conversation to Socket so ChatServer disconnects/updates rooms
+      if (socket.connected) {
+        socket.emit("close-conversation", { conversationId: conversation.id });
+      }
+
+      // Update local state to CLOSED so they see the ended screen
+      setConversation((prev) => prev ? { ...prev, status: "CLOSED" } : null);
+    } else {
+      handleStartNewChat();
+    }
+  };
+
+  // Listen to the custom DOM event to open chat with tour context
+  useEffect(() => {
+    const handleOpenChatTour = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        console.log("🎒 [CUSTOMER] Received open-chat-tour event", detail);
+        setIsOpen(true);
+        setTourContext(detail);
+        
+        // Remove reset flag since we are opening the chat explicitly
+        localStorage.removeItem("chatSessionReset");
+
+        // Parse existing credentials
+        let storedUser: any = null;
+        try {
+          const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
+          if (rawUser) storedUser = JSON.parse(rawUser);
+        } catch (err) {}
+
+        let storedCustomer: ChatCustomerProfile | null = null;
+        try {
+          const rawCustomer = localStorage.getItem("chatCustomer");
+          if (rawCustomer) storedCustomer = JSON.parse(rawCustomer);
+        } catch (err) {}
+
+        if (conversation) {
+          // If conversation already active, just send context link
+          sendTourLinkContext(detail.tourId, detail.tourName, detail.tourPrice);
+        } else if (storedUser) {
+          const userId = storedUser.id || storedUser.userId;
+          const fullName = storedUser.fullName || storedUser.name || storedUser.userName || "Khách hàng";
+          await initiateChatSession({
+            userId,
+            fullName,
+            email: storedUser.email || undefined,
+            phone: storedUser.phone || undefined,
+            tourId: detail.tourId,
+          } as any);
+        } else if (storedCustomer) {
+          await initiateChatSession({
+            chatCustomerId: storedCustomer.id,
+            fullName: storedCustomer.fullName,
+            email: storedCustomer.email,
+            phone: storedCustomer.phone,
+            sessionId: storedCustomer.sessionId,
+            tourId: detail.tourId,
+          } as any);
+        } else {
+          setShowPreChatForm(true);
+        }
+      }
+    };
+
+    window.addEventListener("open-chat-tour", handleOpenChatTour);
+    return () => {
+      window.removeEventListener("open-chat-tour", handleOpenChatTour);
+    };
+  }, [conversation, chatCustomer, tourContext]);
 
   return (
     <div className="fixed bottom-6 right-6 z-50 font-sans">
@@ -460,6 +590,23 @@ export default function ChatWidget({
                 <p className="text-xs text-gray-500 mt-4 font-semibold animate-pulse">
                   Đang kết nối hỗ trợ viên...
                 </p>
+              </div>
+            ) : conversation?.status === "CLOSED" ? (
+              /* Conversation Ended screen */
+              <div className="flex-1 flex flex-col items-center justify-center bg-white p-6 text-center animate-in fade-in duration-300">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-3xl mb-4 shadow-sm border border-emerald-100">
+                  ✓
+                </div>
+                <h4 className="text-base font-bold text-gray-800">Trò chuyện đã kết thúc</h4>
+                <p className="text-xs text-gray-500 mt-2 max-w-[240px] leading-relaxed">
+                  Cảm ơn bạn đã trò chuyện với chúng tôi. Cuộc trò chuyện này đã được kết thúc thành công.
+                </p>
+                <button
+                  onClick={handleStartNewChat}
+                  className="mt-6 px-6 py-2.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer font-sans"
+                >
+                  Bắt đầu cuộc trò chuyện mới
+                </button>
               </div>
             ) : showPreChatForm ? (
               /* Pre-Chat Form UI */
@@ -561,6 +708,27 @@ export default function ChatWidget({
                         );
                       }
 
+                      // Parse tour details if it's a tour link
+                      const isTourLink = msg.messageType === "TOUR_LINK" || msg.content?.startsWith("[TOUR_LINK:");
+                      let tourId = "";
+                      let tourName = "";
+                      let tourPrice = "";
+
+                      if (isTourLink) {
+                        const match = msg.content?.match(/\[TOUR_LINK:tourId=(.*?)&name=(.*?)&price=(.*?)\]/);
+                        if (match) {
+                          tourId = match[1];
+                          tourName = match[2];
+                          tourPrice = match[3];
+                        } else {
+                          const nameMatch = msg.content?.match(/\*(.*?)\*/);
+                          const priceMatch = msg.content?.match(/\((.*?) VND\)/);
+                          tourName = nameMatch ? nameMatch[1] : "Chi tiết Tour";
+                          tourPrice = priceMatch ? priceMatch[1] : "";
+                          tourId = conversation?.tour?.id || currentTourId || "";
+                        }
+                      }
+
                       return (
                         <div
                           key={index}
@@ -586,15 +754,51 @@ export default function ChatWidget({
                               </span>
                             )}
                             {/* Message Bubble */}
-                            <div
-                              className={`px-3 py-2 text-xs shadow-sm ${
-                                isMe
-                                  ? "bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] text-white rounded-2xl rounded-tr-none"
-                                  : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-tl-none"
-                              } ${msg.messageType === "TOUR_LINK" ? "border-l-4 border-l-amber-500 bg-amber-50/50" : ""}`}
-                            >
-                              <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                            </div>
+                            {isTourLink ? (
+                              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-sm w-full my-1 flex flex-col gap-3 border-l-4 border-l-amber-500 text-left">
+                                <div className="flex gap-2.5">
+                                  <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
+                                    🌴
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-[8px] uppercase font-bold text-amber-700 tracking-wider block">
+                                      Tour đang quan tâm
+                                    </span>
+                                    <h5 className="font-extrabold text-slate-800 text-[11px] leading-snug line-clamp-2 mt-0.5">
+                                      {tourName}
+                                    </h5>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between border-t border-amber-100/70 pt-2.5 mt-0.5">
+                                  <div className="flex flex-col">
+                                    <span className="text-[8px] uppercase font-bold text-slate-400">Giá tham khảo</span>
+                                    <span className="text-xs font-black text-amber-600">
+                                      {tourPrice ? `${Number(tourPrice.replace(/[^0-9]/g, "")).toLocaleString("vi-VN")} đ` : "Liên hệ"}
+                                    </span>
+                                  </div>
+                                  {tourId && (
+                                    <a
+                                      href={`/tours/detail?id=${tourId}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm active:scale-95 text-center cursor-pointer font-sans"
+                                    >
+                                      Xem chi tiết →
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div
+                                className={`px-3 py-2 text-xs shadow-sm ${
+                                  isMe
+                                    ? "bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] text-white rounded-2xl rounded-tr-none"
+                                    : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-tl-none"
+                                }`}
+                              >
+                                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
