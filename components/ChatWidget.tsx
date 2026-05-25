@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import socket from "@/lib/socket";
-import { apiFetch } from "@/lib/api/config";
+import { apiFetch, API_BASE_URL } from "@/lib/api/config";
+import { MessageBubble } from "./ChatCards";
 
 // --- Types ---
 interface ChatCustomerProfile {
@@ -107,6 +108,7 @@ export default function ChatWidget({
   ]);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const aiEventSourceRef = useRef<EventSource | null>(null);
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -253,6 +255,24 @@ export default function ChatWidget({
       window.removeEventListener("auth-state-change", handleAuthChange);
     };
   }, [conversation]);
+
+  // Clean up AI streams when activeTab changes, isOpen changes or component unmounts
+  useEffect(() => {
+    if ((activeTab === "STAFF" || !isOpen) && aiEventSourceRef.current) {
+      console.log("🔌 Closing AI EventSource connection...");
+      aiEventSourceRef.current.close();
+      aiEventSourceRef.current = null;
+    }
+  }, [activeTab, isOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (aiEventSourceRef.current) {
+        aiEventSourceRef.current.close();
+      }
+    };
+  }, []);
+
 
   // --- Socket.io Listeners ---
   useEffect(() => {
@@ -570,7 +590,6 @@ export default function ChatWidget({
   };
 
   const handleSendAiMessage = (customText?: string) => {
-
     const text = customText || aiInputValue.trim();
     if (!text) return;
 
@@ -582,30 +601,48 @@ export default function ChatWidget({
       createdAt: new Date().toISOString(),
     };
 
-    setAiMessages((prev) => [...prev, userMsg]);
+    const aiMsgId = `ai-msg-${Date.now()}`;
+    const initialAiMsg = {
+      id: aiMsgId,
+      senderType: "AI",
+      content: "",
+      createdAt: new Date().toISOString(),
+    };
+
+    setAiMessages((prev) => [...prev, userMsg, initialAiMsg]);
     scrollToBottom();
 
-    // AI Response simulation
-    setTimeout(() => {
-      let aiResponseText = "Cảm ơn câu hỏi của bạn! Trợ lý AI của iTour đang học hỏi thêm dữ liệu. Bạn có thể nhấn sang tab 'Nhân viên' bên cạnh để gặp trực tiếp Tư vấn viên hỗ trợ ngay lập tức nhé! 🎧";
-      const norm = text.toLowerCase();
-      if (norm.includes("hot") || norm.includes("tour nào") || norm.includes("lai châu")) {
-        aiResponseText = "Hiện tại tour hot nhất hè 2026 là 'Tour Lai Châu - Khám Phá Mới' với ưu đãi giảm 10% khi đặt trong tuần này! Bạn có muốn tôi xem thông tin chi tiết không?";
-      } else if (norm.includes("trẻ em") || norm.includes("vé") || norm.includes("giá vé") || norm.includes("em bé")) {
-        aiResponseText = "Chính sách vé trẻ em tại iTour: Trẻ em dưới 5 tuổi hoàn toàn MIỄN PHÍ. Trẻ em từ 5-11 tuổi được hưởng mức giá bằng 75% giá người lớn. Từ 12 tuổi trở lên áp dụng giá người lớn.";
-      } else if (norm.includes("ưu đãi") || norm.includes("khuyến mãi") || norm.includes("giảm giá") || norm.includes("quà")) {
-        aiResponseText = "iTour đang có chương trình khuyến mãi hè đặc biệt: Đi nhóm từ 5 người giảm ngay 5% tổng hóa đơn, nhóm từ 10 người giảm 8% kèm tặng nón du lịch cao cấp và áo thun kỷ niệm!";
-      }
+    // Close any previous EventSource connection to prevent leak
+    if (aiEventSourceRef.current) {
+      aiEventSourceRef.current.close();
+    }
 
-      const aiMsg = {
-        id: `ai-msg-${Date.now()}`,
-        senderType: "AI",
-        content: aiResponseText,
-        createdAt: new Date().toISOString(),
-      };
-      setAiMessages((prev) => [...prev, aiMsg]);
+    const url = `${API_BASE_URL}/ai/stream?message=${encodeURIComponent(text)}`;
+    const eventSource = new EventSource(url);
+    aiEventSourceRef.current = eventSource;
+
+    eventSource.onmessage = (event) => {
+      const token = event.data;
+      setAiMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === aiMsgId ? { ...msg, content: msg.content + token } : msg
+        )
+      );
       scrollToBottom();
-    }, 800);
+    };
+
+    eventSource.addEventListener("error", (event: any) => {
+      if (event.data) {
+        const errorMsg = event.data;
+        setAiMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMsgId ? { ...msg, content: msg.content + "\n" + errorMsg } : msg
+          )
+        );
+      }
+      eventSource.close();
+      scrollToBottom();
+    });
   };
 
   // Scroll to bottom when AI messages update
@@ -877,15 +914,7 @@ export default function ChatWidget({
                           <span className="text-[8px] font-bold text-gray-400 ml-1 mb-0.5">
                             {isAi ? "Trợ lý AI" : "Bạn"}
                           </span>
-                          <div
-                            className={`px-3 py-2 text-xs shadow-sm ${
-                              !isAi
-                                ? "bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] text-white rounded-2xl rounded-tr-none"
-                                : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-tl-none"
-                            }`}
-                          >
-                            <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                          </div>
+                          <MessageBubble content={msg.content} isMe={!isAi} />
                         </div>
                       </div>
                     );
@@ -1119,37 +1148,6 @@ export default function ChatWidget({
                         const isMe = msg.senderType === "CUSTOMER";
                         const isSystem = msg.senderType === "SYSTEM";
 
-                        if (isSystem) {
-                          return (
-                            <div key={index} className="flex justify-center my-2 shrink-0">
-                              <span className="bg-gray-100 text-[10px] text-gray-500 font-semibold px-3 py-1 rounded-full text-center max-w-[80%] shadow-sm">
-                                {msg.content}
-                              </span>
-                            </div>
-                          );
-                        }
-
-                        // Parse tour details if it's a tour link
-                        const isTourLink = msg.messageType === "TOUR_LINK" || msg.content?.startsWith("[TOUR_LINK:");
-                        let tourId = "";
-                        let tourName = "";
-                        let tourPrice = "";
-
-                        if (isTourLink) {
-                          const match = msg.content?.match(/\[TOUR_LINK:tourId=(.*?)&name=(.*?)&price=(.*?)\]/);
-                          if (match) {
-                            tourId = match[1];
-                            tourName = match[2];
-                            tourPrice = match[3];
-                          } else {
-                            const nameMatch = msg.content?.match(/\*(.*?)\*/);
-                            const priceMatch = msg.content?.match(/\((.*?) VND\)/);
-                            tourName = nameMatch ? nameMatch[1] : "Chi tiết Tour";
-                            tourPrice = priceMatch ? priceMatch[1] : "";
-                            tourId = conversation?.tour?.id || currentTourId || "";
-                          }
-                        }
-
                         return (
                           <div
                             key={index}
@@ -1172,54 +1170,10 @@ export default function ChatWidget({
                               {isMe && (
                                 <span className="text-[9px] font-bold text-gray-400 mr-1 mb-0.5 text-right">
                                   Bạn
-                              </span>
+                                </span>
                               )}
                               {/* Message Bubble */}
-                              {isTourLink ? (
-                                <div className="bg-gradient-to-br from-blue-50/70 to-indigo-50/40 border border-blue-100 rounded-2xl p-4 shadow-sm w-full my-1 flex flex-col gap-3 border-l-4 border-l-blue-500 text-left animate-in fade-in duration-300">
-                                  <div className="flex gap-2.5">
-                                    <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm shrink-0">
-                                      <img src="/assets/3-5.png" alt="Tour" className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <span className="text-[9px] uppercase font-bold text-blue-700 tracking-wider block">
-                                        Yêu cầu tư vấn Tour
-                                      </span>
-                                      <h5 className="font-extrabold text-slate-800 text-xs leading-snug line-clamp-2 mt-0.5">
-                                        {tourName}
-                                      </h5>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center justify-between border-t border-blue-100/70 pt-2.5 mt-0.5">
-                                    <div className="flex flex-col">
-                                      <span className="text-[8px] uppercase font-bold text-slate-400">Giá tham khảo</span>
-                                      <span className="text-xs font-black text-blue-600">
-                                        {tourPrice ? `${Number(tourPrice.replace(/[^0-9]/g, "")).toLocaleString("vi-VN")} đ` : "Liên hệ"}
-                                      </span>
-                                    </div>
-                                    {tourId && (
-                                      <a
-                                        href={`/tours/detail?id=${tourId}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm active:scale-95 text-center cursor-pointer font-sans"
-                                      >
-                                        Xem chi tiết →
-                                      </a>
-                                    )}
-                                  </div>
-                                </div>
-                              ) : (
-                                <div
-                                  className={`px-3 py-2 text-xs shadow-sm ${
-                                    isMe
-                                      ? "bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] text-white rounded-2xl rounded-tr-none"
-                                      : "bg-white text-gray-800 border border-gray-100 rounded-2xl rounded-tl-none"
-                                  }`}
-                                >
-                                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
-                                </div>
-                              )}
+                              <MessageBubble content={msg.content} isMe={isMe} />
                             </div>
                           </div>
                         );
