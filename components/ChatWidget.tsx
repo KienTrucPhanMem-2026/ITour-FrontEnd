@@ -58,7 +58,15 @@ export default function ChatWidget({
   const [showPreChatForm, setShowPreChatForm] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  
+  // --- Rating States ---
+  const [rating, setRating] = useState<number | null>(null);
+  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+
   const [tourContext, setTourContext] = useState<{
+
     tourId: string;
     tourName: string;
     tourPrice: string | number;
@@ -481,10 +489,14 @@ export default function ChatWidget({
     setMessages([]);
     setTourContext(null);
     setShowPreChatForm(true);
+    setRating(null);
+    setHoveredRating(null);
+    setRatingSubmitted(false);
     if (socket.connected) {
       socket.disconnect();
     }
   };
+
 
   const handleResetSession = () => {
     if (conversation) {
@@ -504,6 +516,24 @@ export default function ChatWidget({
       handleStartNewChat();
     }
   };
+
+  const handleSendRating = async (stars: number) => {
+    if (!conversation) return;
+    setSubmittingRating(true);
+    try {
+      await apiFetch(`/conversations/${conversation.id}/rate`, {
+        method: "POST",
+        body: JSON.stringify({ rate: stars }),
+      });
+      setRating(stars);
+      setRatingSubmitted(true);
+    } catch (e) {
+      console.error("Failed to submit rating", e);
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
 
   // Listen to the custom DOM event to open chat with tour context
   useEffect(() => {
@@ -766,22 +796,96 @@ export default function ChatWidget({
                   </p>
                 </div>
               ) : conversation?.status === "CLOSED" ? (
-                /* Conversation Ended screen */
+                /* Conversation Ended screen with Rating */
                 <div className="flex-1 flex flex-col items-center justify-center bg-white p-6 text-center animate-in fade-in duration-300">
-                  <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-3xl mb-4 shadow-sm border border-emerald-100">
-                    ✓
-                  </div>
-                  <h4 className="text-base font-bold text-gray-800">Trò chuyện đã kết thúc</h4>
-                  <p className="text-xs text-gray-500 mt-2 max-w-[240px] leading-relaxed">
-                    Cảm ơn bạn đã trò chuyện với chúng tôi. Cuộc trò chuyện này đã được kết thúc thành công.
-                  </p>
-                  <button
-                    onClick={handleStartNewChat}
-                    className="mt-6 px-6 py-2.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer font-sans"
-                  >
-                    Bắt đầu cuộc trò chuyện mới
-                  </button>
+                  {!ratingSubmitted ? (
+                    <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-200">
+                      <div className="w-16 h-16 rounded-full bg-sky-50 text-[#0EA5E9] flex items-center justify-center text-3xl mb-4 shadow-sm border border-sky-100 animate-bounce duration-1000">
+                        🤝
+                      </div>
+                      <h4 className="text-base font-bold text-gray-800">Cuộc trò chuyện kết thúc</h4>
+                      <p className="text-xs text-gray-500 mt-2 max-w-[250px] leading-relaxed">
+                        Cảm ơn bạn đã trò chuyện với chúng tôi. Bạn đánh giá thế nào về sự hỗ trợ của tư vấn viên?
+                      </p>
+
+                      {/* Star Rating Selection */}
+                      <div className="flex items-center gap-2 my-5">
+                        {[1, 2, 3, 4, 5].map((star) => {
+                          const isActive = hoveredRating !== null ? star <= hoveredRating : rating !== null ? star <= rating : false;
+                          return (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setRating(star)}
+                              onMouseEnter={() => setHoveredRating(star)}
+                              onMouseLeave={() => setHoveredRating(null)}
+                              className="text-2xl transition-transform duration-100 hover:scale-125 focus:outline-none"
+                              title={`${star} sao`}
+                            >
+                              <svg
+                                className={`w-8 h-8 ${isActive ? 'text-amber-400 fill-current' : 'text-gray-300'}`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.237.588 1.81l-3.97 2.883a1 1 0 00-.364 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.971-2.883a1 1 0 00-1.17 0l-3.97 2.883c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.364-1.118L2.98 9.42c-.773-.573-.374-1.81.588-1.81h4.907a1 1 0 00.95-.69l1.519-4.674z"
+                                />
+                              </svg>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        onClick={() => rating && handleSendRating(rating)}
+                        disabled={rating === null || submittingRating}
+                        className="w-full py-2.5 bg-[#0EA5E9] hover:bg-[#0284C7] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 font-sans"
+                      >
+                        {submittingRating ? (
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        ) : (
+                          "Gửi đánh giá"
+                        )}
+                      </button>
+
+                      <button
+                        onClick={handleStartNewChat}
+                        className="mt-3 text-xs text-gray-400 hover:text-gray-600 transition-colors underline font-medium"
+                      >
+                        Bỏ qua & Bắt đầu chat mới
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-200">
+                      <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-3xl mb-4 shadow-sm border border-emerald-100 animate-in spin-in-12 duration-500">
+                        ✓
+                      </div>
+                      <h4 className="text-base font-bold text-gray-800">Cảm ơn bạn đã đánh giá!</h4>
+                      <p className="text-xs text-gray-500 mt-2 max-w-[240px] leading-relaxed">
+                        Đánh giá của bạn đã được ghi lại thành công. Ý kiến của bạn giúp chúng tôi cải thiện chất lượng dịch vụ tốt hơn.
+                      </p>
+                      
+                      {rating && (
+                        <div className="mt-4 px-3 py-1.5 bg-amber-50 rounded-full border border-amber-100 text-xs font-bold text-amber-700 flex items-center gap-1">
+                          <span>Đã đánh giá: {rating}</span>
+                          <span className="text-amber-400">★</span>
+                        </div>
+                      )}
+
+                      <button
+                        onClick={handleStartNewChat}
+                        className="mt-6 px-6 py-2.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer font-sans"
+                      >
+                        Bắt đầu cuộc trò chuyện mới
+                      </button>
+                    </div>
+                  )}
                 </div>
+
               ) : showPreChatForm ? (
                 /* Pre-Chat Form UI */
                 <div className="flex-1 flex flex-col justify-center px-6 py-8 bg-white overflow-y-auto">
