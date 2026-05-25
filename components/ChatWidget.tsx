@@ -88,6 +88,7 @@ export default function ChatWidget({
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [pendingCustomerInfo, setPendingCustomerInfo] = useState<any | null>(null);
+  const [ratingComment, setRatingComment] = useState("");
 
   // --- AI FAQ Chat States ---
   const [activeTab, setActiveTab] = useState<"AI" | "STAFF">("AI");
@@ -378,17 +379,24 @@ export default function ChatWidget({
         // Wait for connect event or emit immediately if already connected
         const emitInitialStuff = () => {
           if (socket.connected) {
+            // Step 1: broadcast new-conversation so consultant's dashboard can refresh & join room
             socket.emit("new-conversation", res);
             socket.emit("join-conversation", { conversationId: res.id });
+
+            // Step 2: delay sending the first message slightly so the consultant side
+            // has time to receive the new-conversation-created event, re-fetch the list,
+            // and join the socket room before the message is broadcast
             if (initialMessageText) {
               const isTourLink = initialMessageText.startsWith("[TOUR_LINK:");
-              socket.emit("send-message", {
-                conversationId: res.id,
-                text: initialMessageText,
-                senderType: "CUSTOMER",
-                customerId: res.chatCustomer.id,
-                messageType: isTourLink ? "TOUR_LINK" : "TEXT",
-              });
+              setTimeout(() => {
+                socket.emit("send-message", {
+                  conversationId: res.id,
+                  text: initialMessageText,
+                  senderType: "CUSTOMER",
+                  customerId: res.chatCustomer.id,
+                  messageType: isTourLink ? "TOUR_LINK" : "TEXT",
+                });
+              }, 800); // 800ms gives consultant dashboard time to join the room
             }
           }
         };
@@ -398,6 +406,7 @@ export default function ChatWidget({
         } else {
           socket.once("connect", emitInitialStuff);
         }
+
 
         // 2. Optimistically add initial message if provided, otherwise fetch history
         if (initialMessageText) {
@@ -614,6 +623,7 @@ export default function ChatWidget({
     setShowPreChatForm(true);
     setRating(null);
     setHoveredRating(null);
+    setRatingComment("");
     setRatingSubmitted(false);
     if (socket.connected) {
       socket.disconnect();
@@ -646,7 +656,7 @@ export default function ChatWidget({
     try {
       await apiFetch(`/conversations/${conversation.id}/rate`, {
         method: "POST",
-        body: JSON.stringify({ rate: stars }),
+        body: JSON.stringify({ rate: stars, comment: ratingComment }),
       });
       setRating(stars);
       setRatingSubmitted(true);
@@ -961,6 +971,16 @@ export default function ChatWidget({
                             </button>
                           );
                         })}
+                      </div>
+
+                      {/* Textarea for comments */}
+                      <div className="w-full mb-4">
+                        <textarea
+                          placeholder="Nhập nhận xét của bạn (không bắt buộc)..."
+                          value={ratingComment}
+                          onChange={(e) => setRatingComment(e.target.value)}
+                          className="w-full p-2.5 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent transition-all placeholder:text-gray-400 bg-gray-50/50 resize-none h-20 text-slate-800"
+                        />
                       </div>
 
                       <button
