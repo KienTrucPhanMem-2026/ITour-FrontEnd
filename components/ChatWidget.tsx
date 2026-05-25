@@ -29,6 +29,11 @@ interface Conversation {
     id: string;
     fullName: string;
   };
+  tour?: {
+    id: string;
+    name: string;
+    price?: number | string;
+  };
   status: "WAITING" | "ACTIVE" | "CLOSED";
 }
 
@@ -82,6 +87,7 @@ export default function ChatWidget({
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
+  const [pendingCustomerInfo, setPendingCustomerInfo] = useState<any | null>(null);
 
   // --- AI FAQ Chat States ---
   const [activeTab, setActiveTab] = useState<"AI" | "STAFF">("AI");
@@ -109,11 +115,71 @@ export default function ChatWidget({
   };
 
   // --- Initial Phase: Load Existing Session ---
+  // --- Initial Phase: Load Existing Session ---
+  const checkAndSetupLazySession = async (payload: {
+    userId?: string;
+    chatCustomerId?: string;
+    sessionId?: string;
+    fullName: string;
+    email?: string;
+    phone?: string;
+  }) => {
+    // 1. If chatCustomerId exists, check if there is an active conversation in DB
+    if (payload.chatCustomerId) {
+      setLoading(true);
+      try {
+        const res = await apiFetch<Conversation[]>(`/conversations/chat-customer/${payload.chatCustomerId}`);
+        const active = res?.find(c => c.status !== "CLOSED");
+        if (active) {
+          // Yes! Active conversation exists, load it immediately
+          setConversation(active);
+          setChatCustomer(active.chatCustomer);
+          setShowPreChatForm(false);
+          setPendingCustomerInfo(null);
+          // Set auth on socket so ChatServer knows who this customer is
+          socket.auth = { customerId: active.chatCustomer.id };
+          if (!socket.connected) {
+            socket.connect();
+          }
+          fetchMessageHistory(active.id);
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.error("Failed to check active conversations", e);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // 2. Otherwise (or if no active conversation exists), set up a lazy pending session
+    setPendingCustomerInfo(payload);
+    setChatCustomer({
+      id: payload.chatCustomerId || "",
+      fullName: payload.fullName,
+      email: payload.email,
+      phone: payload.phone,
+    });
+    setShowPreChatForm(false);
+    setConversation(null);
+    // Display opening greeting message on client side only
+    setMessages([
+      {
+        conversationId: "pending",
+        senderType: "SYSTEM",
+        content: `Xin chào ${payload.fullName}! iTour rất vui được hỗ trợ bạn. Vui lòng nhập tin nhắn bên dưới để bắt đầu trò chuyện với tư vấn viên.`,
+        messageType: "TEXT",
+        createdAt: new Date().toISOString(),
+      } as any
+    ]);
+  };
+
   const loadActiveSession = (force = false) => {
     if (localStorage.getItem("chatSessionReset") === "true" && !force) {
       setChatCustomer(null);
       setConversation(null);
       setMessages([]);
+      setPendingCustomerInfo(null);
       setShowPreChatForm(true);
       return;
     }
@@ -121,7 +187,7 @@ export default function ChatWidget({
     if (loading && !force) return;
     if (conversation && !force) return;
 
-    // 1. Get logged-in user if exists (Hyper-robust checking for all structures)
+    // 1. Get logged-in user if exists
     let storedUser: any = null;
     try {
       const rawUser = localStorage.getItem("currentUser") || localStorage.getItem("user");
@@ -148,16 +214,14 @@ export default function ChatWidget({
       const userId = storedUser.id || storedUser.userId;
       const fullName = storedUser.fullName || storedUser.name || storedUser.userName || "Khách hàng";
       
-      // User is logged-in, auto-register/retrieve chat session
-      initiateChatSession({
+      checkAndSetupLazySession({
         userId: userId,
         fullName: fullName,
         email: storedUser.email || undefined,
         phone: storedUser.phone || undefined,
       });
     } else if (storedCustomer) {
-      // Returning guest user, auto-register/retrieve chat session
-      initiateChatSession({
+      checkAndSetupLazySession({
         chatCustomerId: storedCustomer.id,
         fullName: storedCustomer.fullName,
         email: storedCustomer.email,
@@ -169,6 +233,7 @@ export default function ChatWidget({
       setChatCustomer(null);
       setConversation(null);
       setMessages([]);
+      setPendingCustomerInfo(null);
       setShowPreChatForm(true);
     }
   };
@@ -270,7 +335,7 @@ export default function ChatWidget({
     email?: string;
     phone?: string;
     tourId?: string;
-  }) => {
+  }, initialMessageText?: string) => {
     // Clear explicit reset flag since we are now starting a conversation
     localStorage.removeItem("chatSessionReset");
 
@@ -299,20 +364,58 @@ export default function ChatWidget({
         setConversation(res);
         setChatCustomer(res.chatCustomer);
         setShowPreChatForm(false);
+        setPendingCustomerInfo(null); // clear pending
 
         // Cache customer details in LocalStorage
         localStorage.setItem("chatCustomer", JSON.stringify(res.chatCustomer));
 
-        // Set auth on socket so ChatServer knows who this customer is
+        // Connect socket explicitly
         socket.auth = { customerId: res.chatCustomer.id };
-
-        // Notify consultants of new conversation
-        if (socket.connected) {
-          socket.emit("new-conversation", res);
+        if (!socket.connected) {
+          socket.connect();
         }
 
-        // 2. Fetch history
-        fetchMessageHistory(res.id);
+        // Wait for connect event or emit immediately if already connected
+        const emitInitialStuff = () => {
+          if (socket.connected) {
+            socket.emit("new-conversation", res);
+            socket.emit("join-conversation", { conversationId: res.id });
+            if (initialMessageText) {
+              const isTourLink = initialMessageText.startsWith("[TOUR_LINK:");
+              socket.emit("send-message", {
+                conversationId: res.id,
+                text: initialMessageText,
+                senderType: "CUSTOMER",
+                customerId: res.chatCustomer.id,
+                messageType: isTourLink ? "TOUR_LINK" : "TEXT",
+              });
+            }
+          }
+        };
+
+        if (socket.connected) {
+          emitInitialStuff();
+        } else {
+          socket.once("connect", emitInitialStuff);
+        }
+
+        // 2. Optimistically add initial message if provided, otherwise fetch history
+        if (initialMessageText) {
+          const isTourLink = initialMessageText.startsWith("[TOUR_LINK:");
+          const optimistic: Message = {
+            id: `tmp-${Date.now()}`,
+            conversationId: res.id,
+            senderType: "CUSTOMER",
+            senderId: res.chatCustomer.id,
+            content: initialMessageText,
+            messageType: isTourLink ? "TOUR_LINK" : "TEXT",
+            createdAt: new Date().toISOString(),
+          } as any;
+          setMessages([optimistic]);
+          scrollToBottom();
+        } else {
+          fetchMessageHistory(res.id);
+        }
       }
     } catch (e) {
       console.error("Failed to initiate chat conversation session", e);
@@ -339,7 +442,7 @@ export default function ChatWidget({
     e.preventDefault();
     if (!fullName.trim()) return;
 
-    initiateChatSession({
+    checkAndSetupLazySession({
       fullName: fullName.trim(),
       email: email.trim() || undefined,
       phone: phone.trim() || undefined,
@@ -347,10 +450,18 @@ export default function ChatWidget({
   };
 
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || !conversation || !chatCustomer) return;
+    if (!inputValue.trim() || !chatCustomer) return;
 
     const text = inputValue.trim();
     setInputValue("");
+
+    if (!conversation && pendingCustomerInfo) {
+      // Lazy initiate conversation in database with this first message
+      initiateChatSession(pendingCustomerInfo, text);
+      return;
+    }
+
+    if (!conversation) return;
 
     // Show message optimistically so UI feels instant
     const optimistic: Message = {
@@ -402,43 +513,55 @@ export default function ChatWidget({
     const tName = tourName || currentTourName || tourContext?.tourName;
     const tPrice = tourPrice || currentTourPrice || tourContext?.tourPrice;
 
-    if (!conversation || !chatCustomer || !tId) return;
+    if (!chatCustomer || !tId) return;
 
     const contentText = `[TOUR_LINK:tourId=${tId}&name=${tName}&price=${tPrice}]`;
 
-    try {
-      if (socket.connected) {
-        socket.emit("send-message", {
-          conversationId: conversation.id,
-          text: contentText,
-          senderType: "CUSTOMER",
-          customerId: chatCustomer.id,
-        });
-      }
-      
-      const savedMsg = await apiFetch<Message>("/messages", {
-        method: "POST",
-        body: JSON.stringify({
-          conversationId: conversation.id,
-          senderType: "CUSTOMER",
-          chatCustomerId: chatCustomer.id,
-          text: contentText,
-          content: contentText,
-          messageType: "TOUR_LINK",
-          isActive: true,
-          isRead: false,
-        }),
+    if (!conversation && pendingCustomerInfo) {
+      // Lazy initiate conversation with the shared tour context
+      const tourPayload = { ...pendingCustomerInfo, tourId: tId };
+      initiateChatSession(tourPayload, contentText);
+      return;
+    }
+
+    if (!conversation) return;
+
+    if (socket.connected) {
+      // Socket path: server saves + broadcasts with real DB ID
+      socket.emit("send-message", {
+        conversationId: conversation.id,
+        text: contentText,
+        senderType: "CUSTOMER",
+        customerId: chatCustomer.id,
       });
-      if (savedMsg) {
-        setMessages((prev) => [...prev, { ...savedMsg, content: savedMsg.content || contentText }]);
-        scrollToBottom();
+    } else {
+      // Fallback: direct REST when socket is offline
+      try {
+        const savedMsg = await apiFetch<Message>("/messages", {
+          method: "POST",
+          body: JSON.stringify({
+            conversationId: conversation.id,
+            senderType: "CUSTOMER",
+            chatCustomerId: chatCustomer.id,
+            text: contentText,
+            content: contentText,
+            messageType: "TOUR_LINK",
+            isActive: true,
+            isRead: false,
+          }),
+        });
+        if (savedMsg) {
+          setMessages((prev) => [...prev, { ...savedMsg, content: savedMsg.content || contentText }]);
+          scrollToBottom();
+        }
+      } catch (e) {
+        console.error("Failed to send tour contextual context", e);
       }
-    } catch (e) {
-      console.error("Failed to send tour contextual context", e);
     }
   };
 
   const handleSendAiMessage = (customText?: string) => {
+
     const text = customText || aiInputValue.trim();
     if (!text) return;
 
@@ -957,7 +1080,7 @@ export default function ChatWidget({
                         <h5 className="font-bold text-gray-800 line-clamp-1 mt-0.5">{currentTourName}</h5>
                       </div>
                       <button
-                        onClick={sendTourLinkContext}
+                        onClick={() => sendTourLinkContext()}
                         className="px-2.5 py-1.5 bg-[#0EA5E9] hover:bg-[#0284C7] text-white rounded-lg font-bold transition-all whitespace-nowrap cursor-pointer shadow-sm"
                       >
                         Chia sẻ Tour
@@ -1033,24 +1156,24 @@ export default function ChatWidget({
                               )}
                               {/* Message Bubble */}
                               {isTourLink ? (
-                                <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-4 shadow-sm w-full my-1 flex flex-col gap-3 border-l-4 border-l-amber-500 text-left">
+                                <div className="bg-gradient-to-br from-blue-50/70 to-indigo-50/40 border border-blue-100 rounded-2xl p-4 shadow-sm w-full my-1 flex flex-col gap-3 border-l-4 border-l-blue-500 text-left animate-in fade-in duration-300">
                                   <div className="flex gap-2.5">
-                                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold text-base shadow-sm shrink-0">
-                                      🌴
+                                    <div className="w-9 h-9 rounded-xl overflow-hidden shadow-sm shrink-0">
+                                      <img src="/assets/3-5.png" alt="Tour" className="w-full h-full object-cover" />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                      <span className="text-[8px] uppercase font-bold text-amber-700 tracking-wider block">
-                                        Tour đang quan tâm
+                                      <span className="text-[9px] uppercase font-bold text-blue-700 tracking-wider block">
+                                        Yêu cầu tư vấn Tour
                                       </span>
-                                      <h5 className="font-extrabold text-slate-800 text-[11px] leading-snug line-clamp-2 mt-0.5">
+                                      <h5 className="font-extrabold text-slate-800 text-xs leading-snug line-clamp-2 mt-0.5">
                                         {tourName}
                                       </h5>
                                     </div>
                                   </div>
-                                  <div className="flex items-center justify-between border-t border-amber-100/70 pt-2.5 mt-0.5">
+                                  <div className="flex items-center justify-between border-t border-blue-100/70 pt-2.5 mt-0.5">
                                     <div className="flex flex-col">
                                       <span className="text-[8px] uppercase font-bold text-slate-400">Giá tham khảo</span>
-                                      <span className="text-xs font-black text-amber-600">
+                                      <span className="text-xs font-black text-blue-600">
                                         {tourPrice ? `${Number(tourPrice.replace(/[^0-9]/g, "")).toLocaleString("vi-VN")} đ` : "Liên hệ"}
                                       </span>
                                     </div>
@@ -1059,7 +1182,7 @@ export default function ChatWidget({
                                         href={`/tours/detail?id=${tourId}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm active:scale-95 text-center cursor-pointer font-sans"
+                                        className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[10px] font-bold rounded-lg transition-all shadow-sm active:scale-95 text-center cursor-pointer font-sans"
                                       >
                                         Xem chi tiết →
                                       </a>
