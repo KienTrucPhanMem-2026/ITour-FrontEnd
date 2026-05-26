@@ -10,6 +10,8 @@ import TourCard from "@/components/TourCard";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import SearchBar from "@/components/SearchBar";
+import { useSearchParams } from "next/navigation";
+import { isDomesticTour } from "@/lib/tourHelpers";
 
 const TOUR_TYPE_LABELS: Record<string, string> = {
   BEACH: "Biển",
@@ -46,6 +48,9 @@ export default function ToursPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
+  const searchParams = useSearchParams();
+  const [selectedGeo, setSelectedGeo] = useState<"all" | "domestic" | "international">("all");
+
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -60,6 +65,17 @@ export default function ToursPage() {
     setCurrentUser(getStoredUser());
     fetchTours();
   }, []);
+
+  useEffect(() => {
+    const categoryParam = searchParams.get("category");
+    if (categoryParam === "domestic") {
+      setSelectedGeo("domestic");
+    } else if (categoryParam === "international") {
+      setSelectedGeo("international");
+    } else {
+      setSelectedGeo("all");
+    }
+  }, [searchParams]);
 
   const fetchTours = async () => {
     try {
@@ -120,6 +136,14 @@ export default function ToursPage() {
         return false;
       }
 
+      // Geographic category
+      if (selectedGeo === "domestic" && !isDomesticTour(tour)) {
+        return false;
+      }
+      if (selectedGeo === "international" && isDomesticTour(tour)) {
+        return false;
+      }
+
       // Price range
       if (tour.price && (tour.price < minPrice || tour.price > maxPrice)) {
         return false;
@@ -145,7 +169,7 @@ export default function ToursPage() {
 
       return true;
     });
-  }, [allTours, searchTerm, selectedType, priceRange, selectedDestination, selectedVehicle, startDateFrom, startDateTo]);
+  }, [allTours, searchTerm, selectedType, priceRange, selectedDestination, selectedVehicle, startDateFrom, startDateTo, selectedGeo]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -236,6 +260,35 @@ export default function ToursPage() {
             {/* ── Sidebar Filter ── */}
             <aside className="lg:col-span-1">
               <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-6 sticky top-24">
+
+                {/* Phân loại địa lý */}
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Phân loại địa lý</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { label: "Tất cả", value: "all" as const },
+                      { label: "Trong nước", value: "domestic" as const },
+                      { label: "Nước ngoài", value: "international" as const },
+                    ].map(geo => {
+                      const count = allTours.filter(t => {
+                        if (geo.value === "all") return true;
+                        if (geo.value === "domestic") return isDomesticTour(t);
+                        return !isDomesticTour(t);
+                      }).length;
+                      return (
+                        <button
+                          key={geo.value}
+                          onClick={() => setSelectedGeo(geo.value)}
+                          className={`px-3 py-1.5 text-xs rounded-full transition ${selectedGeo === geo.value
+                            ? "bg-sky-600 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                            }`}>
+                          {geo.label} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 {/* Tour Type */}
                 <div>
@@ -369,6 +422,7 @@ export default function ToursPage() {
                     setStartDateFrom("");
                     setStartDateTo("");
                     setSortBy("rating");
+                    setSelectedGeo("all");
                   }}
                   className="w-full text-sm py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition">
                   Xóa bộ lọc
@@ -411,6 +465,8 @@ export default function ToursPage() {
                     setSelectedVehicle(null);
                     setStartDateFrom("");
                     setStartDateTo("");
+                    setSortBy("rating");
+                    setSelectedGeo("all");
                   }}
                     className="mt-6 px-6 py-2 bg-[#0EA5E9] text-white rounded-full font-semibold hover:bg-[#0284C7]">
                     Xóa bộ lọc
