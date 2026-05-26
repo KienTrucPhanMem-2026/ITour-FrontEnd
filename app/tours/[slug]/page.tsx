@@ -64,6 +64,11 @@ export default function TourDetailPage() {
   const [loadingItineraries, setLoadingItineraries] = useState(true);
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
 
+  const schedules = tour?.schedules || [];
+  const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
+  const maxSlots = selectedSchedule ? (selectedSchedule.availableSlot ?? 0) : Infinity;
+  const isMaxReached = (adults + children) >= maxSlots;
+
   useEffect(() => {
     const user = getStoredUser();
     setCurrentUser(user);
@@ -141,6 +146,13 @@ export default function TourDetailPage() {
     }
     if (!selectedScheduleId) return alert("Vui lòng chọn lịch khởi hành!");
 
+    if (selectedSchedule) {
+      const maxSlotsVal = selectedSchedule.availableSlot ?? 0;
+      if (adults + children > maxSlotsVal) {
+        return alert(`Số lượng khách vượt quá số chỗ còn trống (${maxSlotsVal} chỗ)!`);
+      }
+    }
+
     const params = new URLSearchParams({
       tourId,
       scheduleId: selectedScheduleId,
@@ -157,8 +169,6 @@ export default function TourDetailPage() {
   if (loadingTour) return <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>;
   if (error || !tour) return <div className="p-20 text-center text-red-500 font-bold">{error || "Tour không tồn tại"}</div>;
 
-  const schedules = tour?.schedules || [];
-  const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
   const unitPrice = selectedSchedule?.price ?? tour?.price ?? 0;
   const totalPrice = unitPrice * adults + unitPrice * 0.7 * children;
 
@@ -220,7 +230,18 @@ export default function TourDetailPage() {
                   return (
                     <button
                       key={schedule.id}
-                      onClick={() => !isFull && setSelectedScheduleId(schedule.id)}
+                      onClick={() => {
+                        if (!isFull) {
+                          setSelectedScheduleId(schedule.id);
+                          const maxSlotsVal = schedule.availableSlot ?? 0;
+                          if (adults + children > maxSlotsVal) {
+                            const newAdults = Math.min(adults, Math.max(1, maxSlotsVal));
+                            const newChildren = Math.min(children, Math.max(0, maxSlotsVal - newAdults));
+                            setAdults(newAdults);
+                            setChildren(newChildren);
+                          }
+                        }
+                      }}
                       disabled={isFull}
                       className={`p-5 rounded-2xl border-2 transition-all text-left relative group ${
                         isFull ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-100" :
@@ -392,10 +413,19 @@ export default function TourDetailPage() {
           {/* Right Column: Booking Card */}
           <aside className="lg:col-span-1">
             <div className="sticky top-28 bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-2xl shadow-slate-200/50">
-              <div className="mb-8">
+              <div className="mb-6">
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-widest block mb-2">Giá tạm tính</span>
                 <span className="text-3xl font-black text-slate-900 tracking-tight">{formatPrice(totalPrice)}</span>
               </div>
+
+              {selectedSchedule && (
+                <div className="mb-6 p-3.5 bg-sky-50/70 rounded-2xl border border-sky-100/50 flex items-center justify-between text-xs text-sky-700 font-medium">
+                  <span>Số chỗ còn lại:</span>
+                  <span className="font-bold text-xs bg-white px-2.5 py-1.5 rounded-xl border border-sky-100/30 shadow-sm text-sky-800">
+                    {selectedSchedule.availableSlot} chỗ
+                  </span>
+                </div>
+              )}
 
               <div className="space-y-6 mb-10">
                 {/* Adults Counter */}
@@ -407,7 +437,17 @@ export default function TourDetailPage() {
                   <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                     <button onClick={() => setAdults(Math.max(1, adults - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
                     <span className="font-bold w-4 text-center text-sm">{adults}</span>
-                    <button onClick={() => setAdults(adults + 1)} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">+</button>
+                    <button 
+                      onClick={() => {
+                        if (adults + children < maxSlots) {
+                          setAdults(adults + 1);
+                        }
+                      }} 
+                      disabled={isMaxReached}
+                      className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
 
@@ -420,7 +460,17 @@ export default function TourDetailPage() {
                   <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                     <button onClick={() => setChildren(Math.max(0, children - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
                     <span className="font-bold w-4 text-center text-sm">{children}</span>
-                    <button onClick={() => setChildren(children + 1)} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">+</button>
+                    <button 
+                      onClick={() => {
+                        if (adults + children < maxSlots) {
+                          setChildren(children + 1);
+                        }
+                      }} 
+                      disabled={isMaxReached}
+                      className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
