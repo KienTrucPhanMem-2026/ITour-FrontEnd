@@ -21,12 +21,14 @@ export function getStoredUser(): UserProfile | null {
 export function setStoredUser(user: UserProfile): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.dispatchEvent(new Event("auth-state-change"));
 }
 
 /** Xóa user info khỏi localStorage (khi logout) */
 export function clearStoredUser(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(USER_KEY);
+  window.dispatchEvent(new Event("auth-state-change"));
 }
 
 /** Kiểm tra user đã đăng nhập chưa (dựa trên localStorage) */
