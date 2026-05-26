@@ -1,5 +1,6 @@
 import { TourDTO } from "@/types/api";
 import Link from "next/link";
+import { MapPin, Clock, Car, Users, Star } from "lucide-react";
 
 function makeSlug(tour: TourDTO): string {
   const namePart = (tour.name ?? "tour")
@@ -72,8 +73,8 @@ export default function TourCard({ tour }: { tour: TourDTO }) {
 
         {tour.rating && (
           <div className="absolute top-4 right-4 z-20">
-            <span className="bg-slate-900/60 backdrop-blur-md text-yellow-400 border border-white/10 text-[10px] font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
-              ★ {tour.rating.toFixed(1)}
+            <span className="bg-slate-900/60 backdrop-blur-md text-white border border-white/10 text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-sm">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> {tour.rating.toFixed(1)}
             </span>
           </div>
         )}
@@ -95,8 +96,8 @@ export default function TourCard({ tour }: { tour: TourDTO }) {
           </h3>
 
           {/* Location */}
-          <div className="text-xs text-white/85 font-semibold flex items-center gap-1.5 mb-4">
-            <span>📍</span>
+          <div className="text-xs text-white/90 font-bold flex items-center gap-1.5 mb-4">
+            <MapPin className="w-4 h-4 fill-sky-400 text-sky-400 shrink-0" />
             <span className="line-clamp-1">
               {tour.startDestinationName || "Việt Nam"}
               {tour.endDestinationName && ` → ${tour.endDestinationName}`}
@@ -104,12 +105,12 @@ export default function TourCard({ tour }: { tour: TourDTO }) {
           </div>
 
           {/* Features Specs Separated by | */}
-          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-white/70 py-3 border-t border-b border-white/10 mb-5">
-            <span>⏱️ {tour.durationDays}N{tour.durationNights ? `${tour.durationNights}Đ` : ""}</span>
+          <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-white py-3 border-t border-b border-white/10 mb-5">
+            <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 fill-sky-400 text-sky-400" /> {tour.durationDays}N{tour.durationNights ? `${tour.durationNights}Đ` : ""}</span>
             <span className="text-white/20">|</span>
-            <span>🚗 {vehicleLabel}</span>
+            <span className="flex items-center gap-1.5"><Car className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400" /> {vehicleLabel}</span>
             <span className="text-white/20">|</span>
-            <span>👤 Còn {tour.availableSlots ?? 10} chỗ</span>
+            <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 fill-purple-400 text-purple-400" /> Còn {tour.availableSlots ?? 10} chỗ</span>
           </div>
 
           {/* Price + Button Row */}
