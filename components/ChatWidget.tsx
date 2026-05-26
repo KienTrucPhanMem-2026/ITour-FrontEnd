@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import socket from "@/lib/socket";
 import { apiFetch, API_BASE_URL } from "@/lib/api/config";
 import { MessageBubble } from "./ChatCards";
+import { Bot, MessageSquare, Headphones, Lightbulb, Flame, Smile, Gift, Handshake, Check, Star } from "lucide-react";
 
 // --- Types ---
 interface ChatCustomerProfile {
@@ -617,7 +618,8 @@ export default function ChatWidget({
       aiEventSourceRef.current.close();
     }
 
-    const url = `${API_BASE_URL}/ai/stream?message=${encodeURIComponent(text)}`;
+    const activeTourId = currentTourId || tourContext?.tourId;
+    const url = `${API_BASE_URL}/ai/stream?message=${encodeURIComponent(text)}${activeTourId ? `&tourId=${activeTourId}` : ""}`;
     const eventSource = new EventSource(url);
     aiEventSourceRef.current = eventSource;
 
@@ -802,8 +804,8 @@ export default function ChatWidget({
           <div className="px-5 py-4 flex items-center justify-between shadow-sm text-white bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] shrink-0">
             <div className="flex items-center gap-3">
               <div className="relative">
-                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center font-bold text-lg border border-white/10 animate-in zoom-in-50 duration-300">
-                  {activeTab === "AI" ? "🤖" : "💬"}
+                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/10 animate-in zoom-in-50 duration-300 text-white">
+                  {activeTab === "AI" ? <Bot className="w-5 h-5 text-white" /> : <MessageSquare className="w-5 h-5 text-white" />}
                 </div>
                 {isConnected && activeTab === "STAFF" && (
                   <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
@@ -854,7 +856,7 @@ export default function ChatWidget({
                   : "border-transparent hover:text-gray-800 hover:bg-gray-50/50"
               }`}
             >
-              🤖 Hỏi đáp
+              <Bot className="w-4 h-4" /> Hỏi đáp
             </button>
             <button
               onClick={() => setActiveTab("STAFF")}
@@ -864,7 +866,7 @@ export default function ChatWidget({
                   : "border-transparent hover:text-gray-800 hover:bg-gray-50/50"
               }`}
             >
-              🎧 Nhân viên
+              <Headphones className="w-4 h-4" /> Nhân viên
             </button>
           </div>
 
@@ -875,8 +877,8 @@ export default function ChatWidget({
               <div className="flex-1 p-4 flex flex-col h-full overflow-hidden bg-gradient-to-b from-slate-50 to-white">
                 {aiMessages.length <= 2 && (
                   <div className="flex flex-col items-center justify-center text-center mt-2 mb-4 shrink-0 animate-in fade-in zoom-in-95 duration-300">
-                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-2xl mb-1.5 shadow-inner relative border border-slate-200/50 animate-bounce duration-1000">
-                      🤖
+                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mb-1.5 shadow-inner relative border border-slate-200/50 animate-bounce duration-1000">
+                      <Bot className="w-6 h-6 text-slate-600" />
                       <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full animate-pulse"></span>
                     </div>
                     <h4 className="text-xs font-bold text-slate-800">Trợ lý ảo iTour AI</h4>
@@ -906,8 +908,8 @@ export default function ChatWidget({
                         className={`flex items-start gap-2 ${!isAi ? "justify-end" : "justify-start"} animate-in slide-in-from-bottom-2 duration-200`}
                       >
                         {isAi && (
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#0EA5E9] to-sky-400 text-white font-bold flex items-center justify-center text-xs shadow-sm shrink-0">
-                            🤖
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#0EA5E9] to-sky-400 text-white font-bold flex items-center justify-center shadow-sm shrink-0">
+                            <Bot className="w-4 h-4 text-white" />
                           </div>
                         )}
                         <div className="flex flex-col max-w-[70%]">
@@ -923,29 +925,34 @@ export default function ChatWidget({
                 </div>
 
                 {/* Quick Action Chips */}
-                <div className="flex flex-col gap-2 pt-3 border-t border-slate-100 shrink-0">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">💡 Gợi ý câu hỏi:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    <button
-                      onClick={() => handleSendAiMessage("Tour nào hot nhất?")}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 text-left border border-slate-200 shadow-sm"
-                    >
-                      🔥 Tour nào hot nhất?
-                    </button>
-                    <button
-                      onClick={() => handleSendAiMessage("Giá vé trẻ em thế nào?")}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 text-left border border-slate-200 shadow-sm"
-                    >
-                      👶 Giá vé trẻ em thế nào?
-                    </button>
-                    <button
-                      onClick={() => handleSendAiMessage("Có chương trình ưu đãi gì không?")}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 text-left border border-slate-200 shadow-sm"
-                    >
-                      🎁 Có chương trình ưu đãi gì không?
-                    </button>
+                {/* Quick Action Chips */}
+                {aiMessages.length <= 2 && (
+                  <div className="flex flex-col gap-2 pt-3 border-t border-slate-100 shrink-0 animate-in fade-in duration-300">
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Lightbulb className="w-3.5 h-3.5 text-amber-500 fill-amber-500/10" /> Gợi ý câu hỏi:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => handleSendAiMessage("Tour nào hot nhất?")}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/10" /> Tour nào hot nhất?
+                      </button>
+                      <button
+                        onClick={() => handleSendAiMessage("Giá vé trẻ em thế nào?")}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Smile className="w-3.5 h-3.5 text-blue-500 fill-blue-500/10" /> Giá vé trẻ em thế nào?
+                      </button>
+                      <button
+                        onClick={() => handleSendAiMessage("Có chương trình ưu đãi gì không?")}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Gift className="w-3.5 h-3.5 text-pink-500 fill-pink-500/10" /> Có chương trình ưu đãi gì không?
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               /* Staff Chat UI */
@@ -962,8 +969,8 @@ export default function ChatWidget({
                 <div className="flex-1 flex flex-col items-center justify-center bg-white p-6 text-center animate-in fade-in duration-300">
                   {!ratingSubmitted ? (
                     <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-200">
-                      <div className="w-16 h-16 rounded-full bg-sky-50 text-[#0EA5E9] flex items-center justify-center text-3xl mb-4 shadow-sm border border-sky-100 animate-bounce duration-1000">
-                        🤝
+                      <div className="w-16 h-16 rounded-full bg-sky-50 text-[#0EA5E9] flex items-center justify-center mb-4 shadow-sm border border-sky-100 animate-bounce duration-1000">
+                        <Handshake className="w-8 h-8 text-[#0EA5E9]" />
                       </div>
                       <h4 className="text-base font-bold text-gray-800">Cuộc trò chuyện kết thúc</h4>
                       <p className="text-xs text-gray-500 mt-2 max-w-[250px] leading-relaxed">
@@ -984,19 +991,9 @@ export default function ChatWidget({
                               className="text-2xl transition-transform duration-100 hover:scale-125 focus:outline-none"
                               title={`${star} sao`}
                             >
-                              <svg
-                                className={`w-8 h-8 ${isActive ? 'text-amber-400 fill-current' : 'text-gray-300'}`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.907c.961 0 1.36 1.237.588 1.81l-3.97 2.883a1 1 0 00-.364 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.971-2.883a1 1 0 00-1.17 0l-3.97 2.883c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.364-1.118L2.98 9.42c-.773-.573-.374-1.81.588-1.81h4.907a1 1 0 00.95-.69l1.519-4.674z"
-                                />
-                              </svg>
+                              <Star
+                                className={`w-8 h-8 ${isActive ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
+                              />
                             </button>
                           );
                         })}
@@ -1033,8 +1030,8 @@ export default function ChatWidget({
                     </div>
                   ) : (
                     <div className="w-full flex flex-col items-center animate-in zoom-in-95 duration-200">
-                      <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center text-3xl mb-4 shadow-sm border border-emerald-100 animate-in spin-in-12 duration-500">
-                        ✓
+                      <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4 shadow-sm border border-emerald-100 animate-in spin-in-12 duration-500">
+                        <Check className="w-8 h-8 text-emerald-500" />
                       </div>
                       <h4 className="text-base font-bold text-gray-800">Cảm ơn bạn đã đánh giá!</h4>
                       <p className="text-xs text-gray-500 mt-2 max-w-[240px] leading-relaxed">
@@ -1044,7 +1041,7 @@ export default function ChatWidget({
                       {rating && (
                         <div className="mt-4 px-3 py-1.5 bg-amber-50 rounded-full border border-amber-100 text-xs font-bold text-amber-700 flex items-center gap-1">
                           <span>Đã đánh giá: {rating}</span>
-                          <span className="text-amber-400">★</span>
+                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                         </div>
                       )}
 
@@ -1062,7 +1059,9 @@ export default function ChatWidget({
                 /* Pre-Chat Form UI */
                 <div className="flex-1 flex flex-col justify-center px-6 py-8 bg-white overflow-y-auto">
                   <div className="text-center mb-6">
-                    <h4 className="text-base font-extrabold text-slate-800">Liên hệ Tư vấn viên 🎧</h4>
+                    <h4 className="text-base font-extrabold text-slate-800 flex items-center justify-center gap-1.5">
+                      Liên hệ Tư vấn viên <Headphones className="w-5 h-5 text-sky-500" />
+                    </h4>
                     <p className="text-[11px] text-gray-500 mt-1">
                       Vui lòng điền thông tin để chúng tôi có thể phục vụ và lưu lại lịch sử hỗ trợ tốt nhất cho bạn.
                     </p>
