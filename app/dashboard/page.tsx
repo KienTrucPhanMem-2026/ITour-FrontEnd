@@ -247,7 +247,12 @@ export default function DashboardPage() {
     if (activeTab !== "bookings" || !user) return;
     setLoadingBookings(true);
     getMyBookingsAPI(user.id)
-      .then(setBookings)
+      .then((data) => {
+        const sorted = (data || []).sort((a: any, b: any) => {
+          return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
+        });
+        setBookings(sorted);
+      })
       .catch(() => setBookings([]))
       .finally(() => setLoadingBookings(false));
   }, [activeTab, user]);

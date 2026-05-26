@@ -27,7 +27,8 @@ export interface UserProfile {
   email: string;
   address?: string;
   dateOfBirth?: string;
-  point?: number; // Add point support for Customer view
+  identityNumber?: string;  // Số CMND / CCCD / Hộ chiếu
+  point?: number;
   createdAt?: string;
 }
 
@@ -35,7 +36,8 @@ export interface UpdateProfileRequest {
   fullName?: string;
   phone?: string;
   address?: string;
-  dateOfBirth?: string; // yyyy-MM-dd
+  dateOfBirth?: string;       // yyyy-MM-dd
+  identityNumber?: string;    // Số CMND / CCCD / Hộ chiếu
 }
 
 /** Wrapper chung cho mọi response */
