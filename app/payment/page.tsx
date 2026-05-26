@@ -240,6 +240,9 @@ function PaymentContent() {
             <div className="w-2 h-2 rounded-full bg-[#D82D8B] animate-ping" />
             <span>Vui lòng không đóng trình duyệt hoặc tải lại trang</span>
           </div>
+          <p className="text-xs text-indigo-400 mt-4 bg-indigo-50 border border-indigo-100 rounded-xl px-4 py-2">
+            💡 Sau khi thanh toán, bạn có thể bổ sung thông tin hành khách trong trang <strong>Chi tiết đặt tour</strong>.
+          </p>
         </div>
       </div>
     );

@@ -74,3 +74,16 @@ export async function getBookingByIdAPI(
     method: "GET",
   });
 }
+
+/**
+ * PUT /api/bookings/{id}/passengers — Cập nhật danh sách hành khách
+ */
+export async function updateBookingPassengersAPI(
+  bookingId: string,
+  passengers: any[]
+): Promise<any> {
+  return apiFetch<any>(`/bookings/${bookingId}/passengers`, {
+    method: "PUT",
+    body: JSON.stringify(passengers),
+  });
+}

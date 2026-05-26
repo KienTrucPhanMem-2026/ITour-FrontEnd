@@ -71,18 +71,38 @@ export default function ProfilePage() {
           fullName: pData.fullName || "",
           phone: pData.phone || "",
           address: pData.address || "",
-          dateOfBirth: pData.dateOfBirth || ""
+          dateOfBirth: pData.dateOfBirth || "",
+          identityNumber: pData.identityNumber || "",
         });
       }
-      setBookings(bData || []);
+      
+      // Sort bookings descending by date (newest first)
+      const sortedBookings = (bData || []).sort((a: any, b: any) => {
+        return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
+      });
+      setBookings(sortedBookings);
       setFavTours(fData || []);
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
-      alert("Não thể tải dữ liệu hồ sơ. Vui lòng thử lại.");
+      alert("Không thể tải dữ liệu hồ sơ. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
   };
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const bookingsPerPage = 5;
+
+  const indexOfLastBooking = currentPage * bookingsPerPage;
+  const indexOfFirstBooking = indexOfLastBooking - bookingsPerPage;
+  const currentBookings = bookings.slice(indexOfFirstBooking, indexOfLastBooking);
+  const totalPages = Math.ceil(bookings.length / bookingsPerPage);
+
+  // Cancel Confirmation Modal states
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [bookingIdToCancel, setBookingIdToCancel] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,21 +122,33 @@ export default function ProfilePage() {
     }
   };
 
-  const handleCancelBooking = async (bookingId: string) => {
-    if (!window.confirm("Bạn có chắc chắn muốn hủy đơn đặt tour này không?")) return;
+  const handleCancelBooking = (bookingId: string) => {
+    setBookingIdToCancel(bookingId);
+    setCancelModalOpen(true);
+  };
+
+  const confirmCancelBooking = async () => {
+    if (!bookingIdToCancel) return;
+    setIsCancelling(true);
     try {
-      await cancelBookingAPI(bookingId);
+      await cancelBookingAPI(bookingIdToCancel);
       // Reload bookings list
       if (profile) {
         const bData = await getMyBookingsAPI(profile.id);
-        setBookings(bData);
+        const sorted = (bData || []).sort((a: any, b: any) => {
+          return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
+        });
+        setBookings(sorted);
         // reload profile to update points if reversed
         const pData = await getUserProfileAPI(profile.id);
         setProfile(pData);
       }
-      alert("Đã hủy booking thành công.");
     } catch (err: any) {
       alert(err.message || "Không thể hủy đơn này.");
+    } finally {
+      setIsCancelling(false);
+      setCancelModalOpen(false);
+      setBookingIdToCancel(null);
     }
   };
 
@@ -273,6 +305,20 @@ export default function ProfilePage() {
                     />
                   </div>
 
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-2">
+                      Số CMND / CCCD / Hộ chiếu
+                      <span className="ml-1.5 text-gray-400 font-normal normal-case">(dùng tự động điền khi đặt tour)</span>
+                    </label>
+                    <input 
+                      type="text"
+                      placeholder="Nhập số giấy tờ tùy thân"
+                      value={updateForm.identityNumber || ""} 
+                      onChange={e => setUpdateForm({...updateForm, identityNumber: e.target.value})}
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm outline-none transition"
+                    />
+                  </div>
+
                   <div className="md:col-span-2 flex justify-end mt-4">
                     <button 
                       type="submit"
@@ -300,13 +346,49 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="space-y-5">
-                    {bookings.map(b => (
+                    {currentBookings.map(b => (
                       <ProfileBookingCard 
                         key={b.bookingId} 
                         booking={b} 
                         onCancel={handleCancelBooking} 
                       />
                     ))}
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 mt-8 pt-6 border-t border-slate-100">
+                        <button
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                          Trước
+                        </button>
+                        {Array.from({ length: totalPages }).map((_, index) => {
+                          const pageNum = index + 1;
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setCurrentPage(pageNum)}
+                              className={`w-9 h-9 rounded-xl text-xs font-bold transition-all border ${
+                                currentPage === pageNum
+                                  ? "bg-[#0EA5E9] text-white border-[#0EA5E9] shadow-md shadow-sky-100"
+                                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                              }`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        })}
+                        <button
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                        >
+                          Sau
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -351,6 +433,43 @@ export default function ProfilePage() {
       </main>
 
       <Footer />
+
+      {/* Custom Cancel Confirmation Modal */}
+      {cancelModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100/80 animate-in zoom-in-95 duration-200 text-center">
+            <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto mb-4 border border-rose-100">
+              <span className="text-xl">⚠️</span>
+            </div>
+            <h3 className="text-lg font-black text-slate-900 mb-2">Xác nhận hủy đặt tour</h3>
+            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+              Bạn có chắc chắn muốn hủy đơn đặt tour này không? Hành động này sẽ hoàn trả các slot giữ chỗ và không thể hoàn tác.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setCancelModalOpen(false);
+                  setBookingIdToCancel(null);
+                }}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all active:scale-[0.98]"
+              >
+                Không, giữ lại
+              </button>
+              <button
+                onClick={confirmCancelBooking}
+                disabled={isCancelling}
+                className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.98] shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
+              >
+                {isCancelling ? (
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  "Hủy đặt tour"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
