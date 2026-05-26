@@ -1,15 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { getTourByIdAPI } from "@/lib/api/tours";
+import { getTourByIdAPI, getTourItinerariesAPI } from "@/lib/api/tours";
 import { getStoredUser } from "@/lib/auth";
 import { getMyBookingsAPI } from "@/lib/api/bookings";
 import ReviewList from "@/components/ReviewList";
 import ReviewForm from "@/components/ReviewForm";
 import type { TourDTO, UserProfile } from "@/types/api";
 import Header from "@/components/Header";
+
+interface ItineraryDetail {
+  id: string;
+  timeFrame: string;
+  activityType: "TRANSPORT" | "DINING" | "VISIT" | "CHECKIN" | string;
+  title: string;
+  note?: string;
+}
+
+interface TourItinerary {
+  id: string;
+  dayNumber: number;
+  title: string;
+  description?: string;
+  itineraryDetails: ItineraryDetail[];
+}
 
 // ─── Helpers ─────────────────────────
 function formatPrice(price?: number): string {
@@ -44,6 +60,14 @@ export default function TourDetailPage() {
   const [reviewRefresh, setReviewRefresh] = useState(0);
   const [userBookings, setUserBookings] = useState<any[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
+  const [itineraries, setItineraries] = useState<TourItinerary[]>([]);
+  const [loadingItineraries, setLoadingItineraries] = useState(true);
+  const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
+
+  const schedules = tour?.schedules || [];
+  const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
+  const maxSlots = selectedSchedule ? (selectedSchedule.availableSlot ?? 0) : Infinity;
+  const isMaxReached = (adults + children) >= maxSlots;
 
   useEffect(() => {
     const user = getStoredUser();
@@ -59,8 +83,31 @@ export default function TourDetailPage() {
       setLoadingTour(true);
       const tourData = await getTourByIdAPI(id);
       setTour(tourData);
-      // Reset selected image when tour changes
       setSelectedImage(0);
+
+      // Tải thông tin kịch bản lịch trình chi tiết
+      try {
+        setLoadingItineraries(true);
+        const itinData = await getTourItinerariesAPI(id);
+        if (itinData) {
+          const sorted = [...itinData]
+            .sort((a, b) => a.dayNumber - b.dayNumber)
+            .map(itin => ({
+              ...itin,
+              itineraryDetails: [...(itin.itineraryDetails ?? [])].sort((a, b) =>
+                (a.timeFrame ?? "").localeCompare(b.timeFrame ?? "")
+              ),
+            }));
+          setItineraries(sorted);
+          if (sorted.length > 0) {
+            setSelectedDayNumber(sorted[0].dayNumber);
+          }
+        }
+      } catch (err) {
+        console.error("Lỗi khi tải lịch trình tour:", err);
+      } finally {
+        setLoadingItineraries(false);
+      }
     } catch {
       setError("Không thể tải thông tin tour.");
     } finally {
@@ -99,6 +146,13 @@ export default function TourDetailPage() {
     }
     if (!selectedScheduleId) return alert("Vui lòng chọn lịch khởi hành!");
 
+    if (selectedSchedule) {
+      const maxSlotsVal = selectedSchedule.availableSlot ?? 0;
+      if (adults + children > maxSlotsVal) {
+        return alert(`Số lượng khách vượt quá số chỗ còn trống (${maxSlotsVal} chỗ)!`);
+      }
+    }
+
     const params = new URLSearchParams({
       tourId,
       scheduleId: selectedScheduleId,
@@ -115,8 +169,6 @@ export default function TourDetailPage() {
   if (loadingTour) return <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>;
   if (error || !tour) return <div className="p-20 text-center text-red-500 font-bold">{error || "Tour không tồn tại"}</div>;
 
-  const schedules = tour?.schedules || [];
-  const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
   const unitPrice = selectedSchedule?.price ?? tour?.price ?? 0;
   const totalPrice = unitPrice * adults + unitPrice * 0.7 * children;
 
@@ -178,7 +230,18 @@ export default function TourDetailPage() {
                   return (
                     <button
                       key={schedule.id}
-                      onClick={() => !isFull && setSelectedScheduleId(schedule.id)}
+                      onClick={() => {
+                        if (!isFull) {
+                          setSelectedScheduleId(schedule.id);
+                          const maxSlotsVal = schedule.availableSlot ?? 0;
+                          if (adults + children > maxSlotsVal) {
+                            const newAdults = Math.min(adults, Math.max(1, maxSlotsVal));
+                            const newChildren = Math.min(children, Math.max(0, maxSlotsVal - newAdults));
+                            setAdults(newAdults);
+                            setChildren(newChildren);
+                          }
+                        }
+                      }}
                       disabled={isFull}
                       className={`p-5 rounded-2xl border-2 transition-all text-left relative group ${
                         isFull ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-100" :
@@ -205,58 +268,100 @@ export default function TourDetailPage() {
             <hr className="my-10 border-slate-100" />
 
             {/* Itinerary Section */}
-            {tour.itinerary && tour.itinerary.length > 0 && (
+            {itineraries.length > 0 && (
               <>
                 <section className="mb-12">
-                  <h2 className="text-2xl font-bold mb-8 flex items-center gap-3">
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
                     🗺️ Lịch trình chi tiết
                   </h2>
-                  <div className="space-y-6">
-                    {tour.itinerary.map((location, index) => (
-                      <div
-                        key={location.id}
-                        className="relative flex gap-6 pb-8 last:pb-0"
-                      >
-                        {/* Timeline line */}
-                        {index < tour.itinerary!.length - 1 && (
-                          <div className="absolute left-6 top-16 bottom-0 w-1 bg-gradient-to-b from-sky-300 to-slate-200"></div>
-                        )}
-                        
-                        {/* Timeline dot */}
-                        <div className="relative flex-shrink-0">
-                          <div className="w-14 h-14 rounded-full bg-gradient-to-br from-sky-400 to-sky-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
-                            {location.visitOrder || index + 1}
-                          </div>
+
+                  {/* Day selection badges */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-thin scrollbar-thumb-sky-200">
+                    {itineraries.map((day) => {
+                      const isActive = day.dayNumber === selectedDayNumber;
+                      return (
+                        <button
+                          key={day.id}
+                          onClick={() => setSelectedDayNumber(day.dayNumber)}
+                          className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-bold transition-all border ${
+                            isActive
+                              ? "bg-sky-500 border-sky-500 text-white shadow-md shadow-sky-100"
+                              : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                          }`}
+                        >
+                          Ngày {day.dayNumber}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Active Day Itinerary Content */}
+                  {(() => {
+                    const activeDay = itineraries.find((d) => d.dayNumber === selectedDayNumber);
+                    if (!activeDay) return null;
+                    return (
+                      <div className="bg-gradient-to-br from-sky-50/50 to-slate-50/50 rounded-3xl p-6 md:p-8 border border-sky-100/70 shadow-sm">
+                        <div className="mb-6">
+                          <h3 className="text-xl font-bold text-slate-900 mb-2">
+                            {activeDay.title}
+                          </h3>
+                          {activeDay.description && (
+                            <p className="text-slate-600 font-light leading-relaxed text-sm">
+                              {activeDay.description}
+                            </p>
+                          )}
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 pt-2">
-                          <div className="bg-gradient-to-br from-sky-50 to-slate-50 rounded-2xl p-6 border border-sky-100 hover:border-sky-300 transition-all">
-                            <div className="flex items-start justify-between mb-3">
-                              <div>
-                                <h3 className="text-xl font-bold text-slate-900 mb-1">
-                                  📍 {location.locationName || "Điểm đến"}
-                                </h3>
-                                {location.days && (
-                                  <p className="text-sm text-slate-500 font-medium">
-                                    ⏱️ {location.days} ngày tại địa điểm
-                                  </p>
-                                )}
-                              </div>
-                              <span className="px-3 py-1 bg-sky-100 text-sky-700 text-xs font-bold rounded-full uppercase">
-                                Ngày {location.visitOrder || index + 1}
-                              </span>
-                            </div>
-                            {location.note && (
-                              <p className="text-slate-700 text-sm leading-relaxed mt-4 p-4 bg-white rounded-xl border border-slate-100">
-                                {location.note}
-                              </p>
-                            )}
+                        {/* Timeline of details */}
+                        {activeDay.itineraryDetails && activeDay.itineraryDetails.length > 0 ? (
+                          <div className="relative pl-6 border-l-2 border-sky-200 space-y-6 ml-2">
+                            {activeDay.itineraryDetails.map((detail) => {
+                              // Determine icon and color based on activity type
+                              let typeLabel = "Hoạt động";
+                              let typeBg = "bg-slate-100 text-slate-600";
+                              if (detail.activityType === "TRANSPORT") {
+                                typeLabel = "Di chuyển";
+                                typeBg = "bg-blue-100 text-blue-600";
+                              } else if (detail.activityType === "DINING") {
+                                typeLabel = "Ăn uống";
+                                typeBg = "bg-amber-100 text-amber-600";
+                              } else if (detail.activityType === "VISIT") {
+                                typeLabel = "Tham quan";
+                                typeBg = "bg-emerald-100 text-emerald-600";
+                              } else if (detail.activityType === "CHECKIN") {
+                                typeLabel = "Khách sạn";
+                                typeBg = "bg-purple-100 text-purple-600";
+                              }
+
+                              return (
+                                <div key={detail.id} className="relative">
+                                  {/* Timeline dot */}
+                                  <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-sky-500 border-2 border-white shadow"></div>
+
+                                  <div className="bg-white rounded-2xl p-4 border border-slate-100 hover:shadow-sm transition-all">
+                                    <div className="flex flex-wrap items-center gap-3 mb-2">
+                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${typeBg}`}>
+                                        {typeLabel}
+                                      </span>
+                                      <span className="text-xs text-slate-400 font-semibold">{detail.timeFrame}</span>
+                                    </div>
+                                    <h4 className="text-sm font-bold text-slate-800 mb-1">{detail.title}</h4>
+                                    {detail.note && (
+                                      <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-100 mt-2">
+                                        💡 {detail.note}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
-                        </div>
+                        ) : (
+                          <div className="text-center py-6 text-slate-400 text-sm">Chưa có thông tin kịch bản chi tiết cho ngày này.</div>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()}
                 </section>
 
                 <hr className="my-10 border-slate-100" />
@@ -308,10 +413,19 @@ export default function TourDetailPage() {
           {/* Right Column: Booking Card */}
           <aside className="lg:col-span-1">
             <div className="sticky top-28 bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-2xl shadow-slate-200/50">
-              <div className="mb-8">
+              <div className="mb-6">
                 <span className="text-slate-400 text-xs font-bold uppercase tracking-widest block mb-2">Giá tạm tính</span>
                 <span className="text-3xl font-black text-slate-900 tracking-tight">{formatPrice(totalPrice)}</span>
               </div>
+
+              {selectedSchedule && (
+                <div className="mb-6 p-3.5 bg-sky-50/70 rounded-2xl border border-sky-100/50 flex items-center justify-between text-xs text-sky-700 font-medium">
+                  <span>Số chỗ còn lại:</span>
+                  <span className="font-bold text-xs bg-white px-2.5 py-1.5 rounded-xl border border-sky-100/30 shadow-sm text-sky-800">
+                    {selectedSchedule.availableSlot} chỗ
+                  </span>
+                </div>
+              )}
 
               <div className="space-y-6 mb-10">
                 {/* Adults Counter */}
@@ -323,7 +437,17 @@ export default function TourDetailPage() {
                   <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                     <button onClick={() => setAdults(Math.max(1, adults - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
                     <span className="font-bold w-4 text-center text-sm">{adults}</span>
-                    <button onClick={() => setAdults(adults + 1)} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">+</button>
+                    <button 
+                      onClick={() => {
+                        if (adults + children < maxSlots) {
+                          setAdults(adults + 1);
+                        }
+                      }} 
+                      disabled={isMaxReached}
+                      className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
 
@@ -336,7 +460,17 @@ export default function TourDetailPage() {
                   <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
                     <button onClick={() => setChildren(Math.max(0, children - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
                     <span className="font-bold w-4 text-center text-sm">{children}</span>
-                    <button onClick={() => setChildren(children + 1)} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">+</button>
+                    <button 
+                      onClick={() => {
+                        if (adults + children < maxSlots) {
+                          setChildren(children + 1);
+                        }
+                      }} 
+                      disabled={isMaxReached}
+                      className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
