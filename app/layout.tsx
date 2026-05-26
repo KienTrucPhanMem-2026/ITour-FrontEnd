@@ -29,6 +29,9 @@ export default function RootLayout({
         <title>Du Lịch Việt - Khám Phá Đất Nước</title>
         <meta name="description" content="Trang web du lịch Việt Nam" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap" rel="stylesheet" />
       </head>
       <body className="bg-[#F5F8F8]">
         <Providers>

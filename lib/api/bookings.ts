@@ -63,3 +63,14 @@ export async function getBookingPaymentUrlAPI(
   );
   return res.data;
 }
+
+/**
+ * GET /api/bookings/{id} — Lấy chi tiết booking theo ID
+ */
+export async function getBookingByIdAPI(
+  bookingId: string
+): Promise<any> {
+  return apiFetch<any>(`/bookings/${bookingId}`, {
+    method: "GET",
+  });
+}
