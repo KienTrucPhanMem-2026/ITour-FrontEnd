@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Eye, EyeOff } from "lucide-react";
+import Header from "@/components/Header";
 import { registerAPI } from "@/lib/api/auth";
 import { setStoredUser } from "@/lib/auth";
 import { ApiError } from "@/lib/api/config";
@@ -111,209 +113,248 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-full bg-[#0EA5E9] flex items-center justify-center mx-auto mb-4">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Đăng Ký Tài Khoản</h1>
-          <p className="text-gray-600">Bắt đầu hành trình du lịch của bạn</p>
-        </div>
+    <div className="min-h-screen bg-[#F5F8F8] flex flex-col">
+      {/* ── Header ── */}
+      <Header logoSrc="/assets/3-1.png" />
 
-        {/* API error banner */}
-        {apiError && (
-          <div className="mb-5 flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-            <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <span>{apiError}</span>
-          </div>
-        )}
+      {/* ── Main Content ── */}
+      <main className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+            <div className="h-2 bg-gradient-to-r from-[#0EA5E9] to-[#38BDF8]" />
+            <div className="px-8 py-10">
+              {/* Heading */}
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#E0F2FE] mb-4">
+                  <svg className="w-8 h-8 text-[#0EA5E9]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                </div>
+                <h1 className="text-2xl font-bold text-gray-900">Đăng ký</h1>
+                <p className="text-sm text-gray-500 mt-1">Bắt đầu hành trình du lịch của bạn cùng itour!</p>
+              </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mb-6">
-          {/* Username */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Tên Đăng Nhập <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.userName}
-              onChange={(e) => setField("userName", e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] transition ${
-                errors.userName ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Nhập tên đăng nhập (VD: nguyenvana)"
-            />
-            {errors.userName && <p className="text-red-500 text-sm mt-1">{errors.userName}</p>}
-          </div>
+              {/* API error banner */}
+              {apiError && (
+                <div className="mb-5 flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
+                  <span>{apiError}</span>
+                </div>
+              )}
 
-          {/* Full Name */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Họ Tên Đầy Đủ <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.fullName}
-              onChange={(e) => setField("fullName", e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] transition ${
-                errors.fullName ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Nhập họ tên đầy đủ"
-            />
-            {errors.fullName && <p className="text-red-500 text-sm mt-1">{errors.fullName}</p>}
-          </div>
+              <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                {/* Username */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Tên đăng nhập <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.userName}
+                    onChange={(e) => setField("userName", e.target.value)}
+                    className={`w-full px-4 py-3 bg-[#F5F8F8] border rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition ${errors.userName
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-gray-200 focus:ring-[#0EA5E9] focus:border-transparent"
+                      }`}
+                    placeholder="Nhập tên đăng nhập (VD: nguyenvana)"
+                  />
+                  {errors.userName && <p className="text-red-500 text-sm mt-1.5">{errors.userName}</p>}
+                </div>
 
-          {/* Email */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Email <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="email"
-              value={formData.email}
-              onChange={(e) => setField("email", e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] transition ${
-                errors.email ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="your@email.com"
-            />
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-          </div>
+                {/* Full Name */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Họ tên đầy đủ <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.fullName}
+                    onChange={(e) => setField("fullName", e.target.value)}
+                    className={`w-full px-4 py-3 bg-[#F5F8F8] border rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition ${errors.fullName
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-gray-200 focus:ring-[#0EA5E9] focus:border-transparent"
+                      }`}
+                    placeholder="Nhập họ tên đầy đủ"
+                  />
+                  {errors.fullName && <p className="text-red-500 text-sm mt-1.5">{errors.fullName}</p>}
+                </div>
 
-          {/* Phone */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Số Điện Thoại <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => setField("phone", e.target.value.replace(/\D/g, ""))}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] transition ${
-                errors.phone ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="0901234567"
-              maxLength={20}
-            />
-            {errors.phone && <p className="text-red-500 text-sm mt-1">{errors.phone}</p>}
-          </div>
+                {/* Email */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Email <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setField("email", e.target.value)}
+                    className={`w-full px-4 py-3 bg-[#F5F8F8] border rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition ${errors.email
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-gray-200 focus:ring-[#0EA5E9] focus:border-transparent"
+                      }`}
+                    placeholder="your@email.com"
+                  />
+                  {errors.email && <p className="text-red-500 text-sm mt-1.5">{errors.email}</p>}
+                </div>
 
-          {/* Address (optional) */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Địa Chỉ <span className="text-gray-400 font-normal">(tùy chọn)</span>
-            </label>
-            <input
-              type="text"
-              value={formData.address}
-              onChange={(e) => setField("address", e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] transition"
-              placeholder="Nhập địa chỉ của bạn"
-            />
-          </div>
+                {/* Phone */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Số điện thoại <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setField("phone", e.target.value.replace(/\D/g, ""))}
+                    className={`w-full px-4 py-3 bg-[#F5F8F8] border rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition ${errors.phone
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-gray-200 focus:ring-[#0EA5E9] focus:border-transparent"
+                      }`}
+                    placeholder="0901234567"
+                    maxLength={20}
+                  />
+                  {errors.phone && <p className="text-red-500 text-sm mt-1.5">{errors.phone}</p>}
+                </div>
 
-          {/* Password */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Mật Khẩu <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={formData.password}
-                onChange={(e) => setField("password", e.target.value)}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] transition ${
-                  errors.password ? "border-red-500" : "border-gray-300"
-                }`}
-                placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-              >
-                {showPassword ? "🙈" : "👁️"}
-              </button>
+                {/* Address (optional) */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Địa chỉ <span className="text-gray-400 font-normal">(tùy chọn)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.address}
+                    onChange={(e) => setField("address", e.target.value)}
+                    className="w-full px-4 py-3 bg-[#F5F8F8] border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent transition"
+                    placeholder="Nhập địa chỉ của bạn"
+                  />
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Mật khẩu <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={formData.password}
+                      onChange={(e) => setField("password", e.target.value)}
+                      className={`w-full px-4 py-3 bg-[#F5F8F8] border rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition ${errors.password
+                          ? "border-red-500 focus:ring-red-500"
+                          : "border-gray-200 focus:ring-[#0EA5E9] focus:border-transparent"
+                        }`}
+                      placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-4 flex items-center text-gray-400 hover:text-[#0EA5E9] transition"
+                      aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-5 h-5" />
+                      ) : (
+                        <Eye className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+                  {errors.password && <p className="text-red-500 text-sm mt-1.5">{errors.password}</p>}
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                    Xác nhận mật khẩu <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setField("confirmPassword", e.target.value)}
+                    className={`w-full px-4 py-3 bg-[#F5F8F8] border rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition ${errors.confirmPassword
+                        ? "border-red-500 focus:ring-red-500"
+                        : "border-gray-200 focus:ring-[#0EA5E9] focus:border-transparent"
+                      }`}
+                    placeholder="Xác nhận mật khẩu"
+                  />
+                  {errors.confirmPassword && (
+                    <p className="text-red-500 text-sm mt-1.5">{errors.confirmPassword}</p>
+                  )}
+                </div>
+
+                {/* Agree to Terms */}
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    id="agreeToTerms"
+                    checked={formData.agreeToTerms}
+                    onChange={(e) => setField("agreeToTerms", e.target.checked)}
+                    className="w-5 h-5 text-[#0EA5E9] rounded border-gray-300 focus:ring-[#0EA5E9] cursor-pointer mt-0.5"
+                  />
+                  <label htmlFor="agreeToTerms" className="text-sm text-gray-700 cursor-pointer select-none">
+                    Tôi đồng ý với{" "}
+                    <Link href="/terms" className="text-[#0EA5E9] hover:underline font-semibold">Điều khoản dịch vụ</Link>{" "}
+                    và{" "}
+                    <Link href="/privacy" className="text-[#0EA5E9] hover:underline font-semibold">Chính sách bảo mật</Link>{" "}
+                    của itour.
+                  </label>
+                </div>
+                {errors.agreeToTerms && (
+                  <p className="text-red-500 text-sm mt-1.5">{errors.agreeToTerms}</p>
+                )}
+
+                {/* Submit */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="relative w-full py-3.5 bg-[#0EA5E9] hover:bg-[#0284C7] disabled:bg-[#7DD3FC] text-white font-semibold text-sm rounded-full shadow-md shadow-[#0EA5E9]/30 transition-all duration-200 flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Đang xử lý...
+                    </>
+                  ) : (
+                    "Đăng ký"
+                  )}
+                </button>
+              </form>
+
+              {/* Login Link */}
+              <p className="text-center text-sm text-gray-500 mt-8">
+                Đã có tài khoản?{" "}
+                <Link href="/login" className="font-semibold text-[#0EA5E9] hover:underline">
+                  Đăng nhập
+                </Link>
+              </p>
             </div>
-            {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
           </div>
 
-          {/* Confirm Password */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">
-              Xác Nhận Mật Khẩu <span className="text-red-500">*</span>
-            </label>
-            <input
-              type={showPassword ? "text" : "password"}
-              value={formData.confirmPassword}
-              onChange={(e) => setField("confirmPassword", e.target.value)}
-              className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] transition ${
-                errors.confirmPassword ? "border-red-500" : "border-gray-300"
-              }`}
-              placeholder="Xác nhận mật khẩu"
-            />
-            {errors.confirmPassword && (
-              <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
-            )}
-          </div>
-
-          {/* Agree to Terms */}
-          <div className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              id="agreeToTerms"
-              checked={formData.agreeToTerms}
-              onChange={(e) => setField("agreeToTerms", e.target.checked)}
-              className="w-5 h-5 text-[#0EA5E9] rounded focus:ring-2 mt-1"
-            />
-            <label htmlFor="agreeToTerms" className="text-sm text-gray-700">
-              Tôi đồng ý với{" "}
-              <Link href="#" className="text-[#0EA5E9] hover:underline font-semibold">Điều khoản dịch vụ</Link>{" "}
-              và{" "}
-              <Link href="#" className="text-[#0EA5E9] hover:underline font-semibold">Chính sách bảo mật</Link>
-            </label>
-          </div>
-          {errors.agreeToTerms && (
-            <p className="text-red-500 text-sm">{errors.agreeToTerms}</p>
-          )}
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-[#0EA5E9] hover:bg-[#0185B8] text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Đang xử lý...
-              </>
-            ) : (
-              "Đăng Ký"
-            )}
-          </button>
-        </form>
-
-        {/* Login Link */}
-        <div className="text-center">
-          <p className="text-gray-600">
-            Đã có tài khoản?{" "}
-            <Link href="/login" className="text-[#0EA5E9] hover:underline font-semibold">
-              Đăng Nhập
-            </Link>
+          <p className="text-center text-xs text-gray-400 mt-6">
+            Bằng cách đăng ký, bạn đồng ý với{" "}
+            <Link href="/terms" className="underline hover:text-gray-600">Điều khoản dịch vụ</Link>{" "}
+            và{" "}
+            <Link href="/privacy" className="underline hover:text-gray-600">Chính sách bảo mật</Link>{" "}
+            của itour.
           </p>
         </div>
-      </div>
+      </main>
+
+      {/* ── Footer ── */}
+      <footer className="bg-white border-t border-gray-100 py-4">
+        <p className="text-center text-xs text-gray-400">
+          © 2026 itour. All rights reserved.
+        </p>
+      </footer>
     </div>
   );
 }
