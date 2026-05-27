@@ -6,7 +6,7 @@ import { getStoredUser, clearStoredUser } from "@/lib/auth";
 import { logoutAPI } from "@/lib/api/auth";
 import type { UserProfile } from "@/types/api";
 
-export default function Header({ logoSrc = "/assets/3-1.png" }: { logoSrc?: string }) {
+export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: string }) {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {

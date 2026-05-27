@@ -156,7 +156,7 @@ export default function LoginPage() {
 
       {/* ── Header ── */}
       <div className="relative z-20">
-        <Header logoSrc="/assets/3-1.png" />
+        <Header logoSrc="/assets/3-3.png" />
       </div>
 
       {/* ── Main Content ── */}

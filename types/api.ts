@@ -135,6 +135,9 @@ export interface BookingResponseDTO {
   pointEarned?: number;
   customerTotalPoint?: number;
   message?: string;
+  reviewed?: boolean;
+  tourGuideId?: string;
+  tourGuideName?: string;
 }
 
 // ---------- MoMo Payment ----------

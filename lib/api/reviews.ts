@@ -4,9 +4,17 @@ export interface ReviewDTO {
   id?: string;
   customerId: string;
   customerName?: string;
-  tourId: string;
-  rating: number;
-  comment?: string;
+  bookingId?: string;
+  tourId?: string;
+  tourGuideId?: string;
+  tourGuideName?: string;
+  rating?: number;        // backward compatibility
+  comment?: string;       // backward compatibility
+  tourRating?: number;
+  tourComment?: string;
+  guideRating?: number;
+  guideComment?: string;
+  reviewType?: string;
   createdAt?: string;
   updatedAt?: string;
   active?: boolean;
@@ -17,6 +25,14 @@ export const getReviewsByTourAPI = async (
 ): Promise<ReviewDTO[]> => {
   const response = await fetch(`${API_BASE_URL}/reviews/tour/${tourId}/latest`);
   if (!response.ok) throw new Error("Failed to fetch reviews");
+  return response.json();
+};
+
+export const getReviewByBookingAPI = async (
+  bookingId: string
+): Promise<ReviewDTO> => {
+  const response = await fetch(`${API_BASE_URL}/reviews/booking/${bookingId}`);
+  if (!response.ok) throw new Error("Failed to fetch review for this booking");
   return response.json();
 };
 

@@ -137,7 +137,7 @@ export default function RegisterPage() {
 
       {/* Header */}
       <div className="relative z-20 w-full">
-        <Header logoSrc="/assets/3-1.png" />
+        <Header logoSrc="/assets/3-3.png" />
       </div>
 
       {/* Main Content Area */}
@@ -174,7 +174,7 @@ export default function RegisterPage() {
 
           {/* Registration Form */}
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-5" noValidate>
-            
+
             {/* Username */}
             <div>
               <label className="block text-sm font-semibold text-white/80 mb-1.5">
@@ -184,11 +184,10 @@ export default function RegisterPage() {
                 type="text"
                 value={formData.userName}
                 onChange={(e) => setField("userName", e.target.value)}
-                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${
-                  errors.userName 
-                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30" 
+                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${errors.userName
+                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30"
                     : "border-white/40 focus:ring-white/30 focus:border-white focus:bg-white/15"
-                }`}
+                  }`}
                 placeholder="VD: nguyenvana123"
               />
               {errors.userName && (
@@ -205,11 +204,10 @@ export default function RegisterPage() {
                 type="text"
                 value={formData.fullName}
                 onChange={(e) => setField("fullName", e.target.value)}
-                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${
-                  errors.fullName 
-                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30" 
+                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${errors.fullName
+                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30"
                     : "border-white/40 focus:ring-white/30 focus:border-white focus:bg-white/15"
-                }`}
+                  }`}
                 placeholder="VD: Nguyễn Văn A"
               />
               {errors.fullName && (
@@ -226,11 +224,10 @@ export default function RegisterPage() {
                 type="email"
                 value={formData.email}
                 onChange={(e) => setField("email", e.target.value)}
-                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${
-                  errors.email 
-                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30" 
+                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${errors.email
+                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30"
                     : "border-white/40 focus:ring-white/30 focus:border-white focus:bg-white/15"
-                }`}
+                  }`}
                 placeholder="example@gmail.com"
               />
               {errors.email && (
@@ -247,11 +244,10 @@ export default function RegisterPage() {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setField("phone", e.target.value.replace(/\D/g, ""))}
-                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${
-                  errors.phone 
-                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30" 
+                className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${errors.phone
+                    ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30"
                     : "border-white/40 focus:ring-white/30 focus:border-white focus:bg-white/15"
-                }`}
+                  }`}
                 placeholder="0901234567"
                 maxLength={20}
               />
@@ -270,11 +266,10 @@ export default function RegisterPage() {
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={(e) => setField("password", e.target.value)}
-                  className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${
-                    errors.password 
-                      ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30" 
+                  className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${errors.password
+                      ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30"
                       : "border-white/40 focus:ring-white/30 focus:border-white focus:bg-white/15"
-                  }`}
+                    }`}
                   placeholder="Nhập mật khẩu (ít nhất 6 ký tự)"
                 />
                 <button
@@ -305,11 +300,10 @@ export default function RegisterPage() {
                   type={showPassword ? "text" : "password"}
                   value={formData.confirmPassword}
                   onChange={(e) => setField("confirmPassword", e.target.value)}
-                  className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${
-                    errors.confirmPassword 
-                      ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30" 
+                  className={`w-full px-4 py-3 bg-white/10 border text-white placeholder-white/40 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all ${errors.confirmPassword
+                      ? "border-[#ff4d4f] focus:ring-[#ff4d4f]/30"
                       : "border-white/40 focus:ring-white/30 focus:border-white focus:bg-white/15"
-                  }`}
+                    }`}
                   placeholder="Xác nhận mật khẩu"
                 />
               </div>

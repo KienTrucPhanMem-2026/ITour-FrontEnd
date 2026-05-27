@@ -139,6 +139,21 @@ export default function ProfileBookingCard({
               <Eye className="w-3.5 h-3.5" /> Chi tiết
             </Link>
 
+            {booking.status === "COMPLETED" && (
+              booking.reviewed ? (
+                <span className="px-3.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-1">
+                  ✓ Đã đánh giá
+                </span>
+              ) : (
+                <Link
+                  href={`/profile/bookings/${booking.bookingId}?openReview=true`}
+                  className="px-3.5 py-1.5 text-xs font-black text-white bg-sky-600 hover:bg-sky-500 rounded-xl transition shadow-md shadow-sky-100 flex items-center gap-1"
+                >
+                  ★ Đánh giá ngay
+                </Link>
+              )
+            )}
+
             {isPending && !isExpired && (
               <button
                 onClick={(e) => {
