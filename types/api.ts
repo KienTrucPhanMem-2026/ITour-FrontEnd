@@ -58,6 +58,14 @@ export interface TourLocationDTO {
   note?: string;               // Description/activities
 }
 
+export interface PricingTierDTO {
+  id: string;
+  minPax: number;
+  maxPax: number;
+  pricePerAdult: number;
+  pricePerChild: number;
+}
+
 export interface TourDTO {
   id: string;
   name: string;
@@ -81,6 +89,7 @@ export interface TourDTO {
   vehicleType?: string;              // Vehicle type
   images?: string[];                 // Tour images URLs
   itinerary?: TourLocationDTO[];     // Tour itinerary (day 1, 2, 3 locations)
+  pricingTiers?: PricingTierDTO[];
 }
 
 // ---------- TourSchedule ----------
@@ -106,6 +115,8 @@ export interface BookingRequestDTO {
   adults: number;
   children: number;
   paymentMethod: PaymentMethod;
+  departureDate?: string;
+  note?: string;
 }
 
 export interface BookingResponseDTO {
@@ -138,6 +149,8 @@ export interface BookingResponseDTO {
   reviewed?: boolean;
   tourGuideId?: string;
   tourGuideName?: string;
+  note?: string;
+  departureDate?: string;
 }
 
 // ---------- MoMo Payment ----------

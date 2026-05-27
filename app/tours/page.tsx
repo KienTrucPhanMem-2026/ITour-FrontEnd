@@ -20,6 +20,8 @@ const TOUR_TYPE_LABELS: Record<string, string> = {
   CULTURAL: "Văn hóa",
   ADVENTURE: "Phiêu lưu",
   ECO: "Sinh thái",
+  JOIN_IN: "Ghép đoàn",
+  PRIVATE: "Tour riêng",
 };
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -259,7 +261,7 @@ export default function ToursPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* ── Sidebar Filter ── */}
             <aside className="lg:col-span-1">
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-6 sticky top-24">
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-6 sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto scrollbar-thin">
 
                 {/* Phân loại địa lý */}
                 <div>
