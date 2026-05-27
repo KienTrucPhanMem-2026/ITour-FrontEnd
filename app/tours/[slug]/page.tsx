@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTourByIdAPI, getTourItinerariesAPI } from "@/lib/api/tours";
@@ -107,6 +107,20 @@ export default function TourDetailPage() {
   const [departureDate, setDepartureDate] = useState("");
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [showGuestPopover, setShowGuestPopover] = useState(false);
+  const guestPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (guestPopoverRef.current && !guestPopoverRef.current.contains(event.target as Node)) {
+        setShowGuestPopover(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   const [selectedImage, setSelectedImage] = useState(0);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
@@ -598,108 +612,140 @@ export default function TourDetailPage() {
 
           {/* Right Column: Booking Card */}
           <aside className="lg:col-span-1">
-            <div className="sticky top-28 bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-2xl shadow-slate-200/50">
+            <div className="sticky top-28 bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-2xl shadow-slate-200/50">
               
               {isPrivate ? (
                 /* ----------------- Private Tour Booking Card ----------------- */
-                <div className="space-y-6">
+                <div className="space-y-4">
                   <div>
-                    <span className="text-slate-400 text-xs font-bold uppercase tracking-widest block mb-1">Dịch vụ Tour riêng</span>
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Yêu cầu Đặt Tour Riêng</h3>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest block mb-0.5">Dịch vụ Tour riêng</span>
+                    <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Yêu cầu Đặt Tour Riêng</h3>
                   </div>
 
                   {/* Input 1: Departure Date picker */}
-                  <div className="space-y-2">
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Ngày khởi hành *</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ngày khởi hành *</label>
                     <input
                       type="date"
                       min={getMinDepartureDate()}
                       value={departureDate}
                       onChange={(e) => setDepartureDate(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm font-semibold text-slate-800"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs font-semibold text-slate-800"
                     />
-                    <p className="text-[10px] text-slate-400 font-medium">Chọn ngày khởi hành (tối thiểu sau 3 ngày nữa)</p>
+                    <p className="text-[9px] text-slate-400 font-medium">Chọn ngày khởi hành (tối thiểu sau 3 ngày nữa)</p>
                   </div>
 
-                  {/* Input 2: Guest Counters */}
-                  <div className="space-y-4 pt-2">
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Số lượng hành khách *</label>
-                    
-                    {/* Adults */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-slate-800 text-sm">Người lớn</p>
-                        <p className="text-[11px] text-slate-400 font-medium">Từ 12 tuổi trở lên</p>
-                      </div>
-                      <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                        <button
-                          onClick={() => setAdults(Math.max(1, adults - 1))}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm"
-                        >
-                          -
-                        </button>
-                        <span className="font-bold w-4 text-center text-sm">{adults}</span>
-                        <button
-                          onClick={() => setAdults(adults + 1)}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+                  {/* Input 2: Guest Selector via Popover */}
+                  <div className="space-y-1.5 relative" ref={guestPopoverRef}>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Số lượng hành khách *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowGuestPopover(!showGuestPopover)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs font-semibold text-slate-800 text-left flex justify-between items-center cursor-pointer"
+                    >
+                      <span>
+                        {adults} Người lớn{children > 0 ? `, ${children} Trẻ em` : ""}{infants > 0 ? `, ${infants} Em bé` : ""}
+                      </span>
+                      <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showGuestPopover ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
 
-                    {/* Children */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-slate-800 text-sm">Trẻ em</p>
-                        <p className="text-[11px] text-slate-400 font-medium">Từ 2 - 11 tuổi</p>
-                      </div>
-                      <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                        <button
-                          onClick={() => setChildren(Math.max(0, children - 1))}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm"
-                        >
-                          -
-                        </button>
-                        <span className="font-bold w-4 text-center text-sm">{children}</span>
-                        <button
-                          onClick={() => setChildren(children + 1)}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+                    {showGuestPopover && (
+                      <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl p-4 border border-slate-100 shadow-2xl shadow-slate-300/80 z-[100] space-y-3">
+                        {/* Adults */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">Người lớn</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Từ 12 tuổi trở lên</p>
+                          </div>
+                          <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setAdults(Math.max(1, adults - 1)); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold w-4 text-center text-xs">{adults}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setAdults(adults + 1); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
 
-                    {/* Infants */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-slate-800 text-sm">Em bé</p>
-                        <p className="text-[11px] text-slate-400 font-medium">Dưới 2 tuổi (Miễn phí)</p>
+                        {/* Children */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">Trẻ em</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Từ 2 - 11 tuổi</p>
+                          </div>
+                          <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setChildren(Math.max(0, children - 1)); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold w-4 text-center text-xs">{children}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setChildren(children + 1); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Infants */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">Em bé</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Dưới 2 tuổi (Miễn phí)</p>
+                          </div>
+                          <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setInfants(Math.max(0, infants - 1)); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold w-4 text-center text-xs">{infants}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setInfants(infants + 1); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="pt-1.5 border-t border-slate-100 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowGuestPopover(false); }}
+                            className="px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-lg hover:bg-sky-600 transition-colors cursor-pointer"
+                          >
+                            Xác nhận
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                        <button
-                          onClick={() => setInfants(Math.max(0, infants - 1))}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm"
-                        >
-                          -
-                        </button>
-                        <span className="font-bold w-4 text-center text-sm">{infants}</span>
-                        <button
-                          onClick={() => setInfants(infants + 1)}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Dynamic Pricing Display */}
-                  <div className="pt-2">
+                  <div className="pt-1.5">
                     {privatePricing?.matched ? (
-                      <div className="space-y-2.5 p-4 bg-sky-50/40 rounded-2xl border border-sky-100/50 text-xs text-slate-600">
-                        <div className="font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                      <div className="space-y-2 p-3 bg-sky-50/40 rounded-xl border border-sky-100/50 text-[10px] text-slate-600">
+                        <div className="font-bold text-slate-700 mb-1 flex items-center gap-1">
                           🏷️ Đơn giá nhóm (Bậc {privatePricing.minPax}-{privatePricing.maxPax} khách)
                         </div>
                         <div className="flex justify-between">
@@ -722,27 +768,27 @@ export default function TourDetailPage() {
                             <span>{infants} × Miễn phí</span>
                           </div>
                         )}
-                        <div className="border-t border-slate-200/60 pt-2.5 mt-2 flex justify-between font-bold text-slate-800 text-sm">
+                        <div className="border-t border-slate-200/60 pt-2 mt-1.5 flex justify-between font-bold text-slate-800 text-xs">
                           <span>Tổng cộng ({adults + children} khách):</span>
-                          <span className="text-emerald-500 font-black text-base">{formatPrice(privatePricing.totalPrice)}</span>
+                          <span className="text-emerald-500 font-black text-sm">{formatPrice(privatePricing.totalPrice)}</span>
                         </div>
                       </div>
                     ) : (
-                      <div className="p-4 bg-rose-50 border border-rose-100 rounded-2xl text-xs text-rose-600 font-medium">
+                      <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-[10px] text-rose-600 font-medium">
                         ⚠️ {privatePricing?.message || "Không có khung giá phù hợp cho số lượng khách này."}
                       </div>
                     )}
                   </div>
 
                   {/* Input 3: Special Notes */}
-                  <div className="space-y-2">
-                    <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Ghi chú đặc biệt (Tùy chọn)</label>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ghi chú đặc biệt (Tùy chọn)</label>
                     <textarea
                       placeholder="VD: Gia đình có người già cần xe gầm thấp, đoàn muốn nâng cấp phòng lên khách sạn 4 sao..."
                       value={specialNote}
                       onChange={(e) => setSpecialNote(e.target.value)}
-                      rows={3}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs font-medium text-slate-700 leading-relaxed resize-none"
+                      rows={2}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-[10px] font-medium text-slate-700 leading-relaxed resize-none"
                     />
                   </div>
 
@@ -750,11 +796,11 @@ export default function TourDetailPage() {
                   <button
                     onClick={handlePrivateBooking}
                     disabled={submittingBooking || !privatePricing?.matched}
-                    className="w-full py-4 bg-sky-600 text-white font-bold rounded-2xl hover:bg-sky-700 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100/50 text-sm tracking-wide flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full py-2.5 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100/50 text-xs tracking-wide flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     {submittingBooking ? (
                       <>
-                        <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                         </svg>
@@ -768,30 +814,30 @@ export default function TourDetailPage() {
               ) : (
                 /* ----------------- Standard Tour Booking Card ----------------- */
                 <>
-                  <div className="mb-6">
-                    <span className="text-slate-400 text-xs font-bold uppercase tracking-widest block mb-2">Giá tạm tính</span>
-                    <span className="text-3xl font-black text-slate-900 tracking-tight">{formatPrice(totalPrice)}</span>
+                  <div className="mb-4">
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest block mb-1">Giá tạm tính</span>
+                    <span className="text-2xl font-black text-slate-900 tracking-tight">{formatPrice(totalPrice)}</span>
                   </div>
 
                   {selectedSchedule && (
-                    <div className="mb-6 p-3.5 bg-sky-50/70 rounded-2xl border border-sky-100/50 flex items-center justify-between text-xs text-sky-700 font-medium">
+                    <div className="mb-4 p-2.5 bg-sky-50/70 rounded-xl border border-sky-100/50 flex items-center justify-between text-[10px] text-sky-700 font-medium">
                       <span>Số chỗ còn lại:</span>
-                      <span className="font-bold text-xs bg-white px-2.5 py-1.5 rounded-xl border border-sky-100/30 shadow-sm text-sky-800">
+                      <span className="font-bold text-[10px] bg-white px-2 py-1 rounded-lg border border-sky-100/30 shadow-sm text-sky-800">
                         {selectedSchedule.availableSlot} chỗ
                       </span>
                     </div>
                   )}
 
-                  <div className="space-y-6 mb-10">
+                  <div className="space-y-4 mb-6">
                     {/* Adults Counter */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-slate-800 text-sm">Người lớn</p>
-                        <p className="text-[11px] text-slate-400 font-medium">Trên 12 tuổi</p>
+                        <p className="font-bold text-slate-800 text-xs">Người lớn</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Trên 12 tuổi</p>
                       </div>
-                      <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                        <button onClick={() => setAdults(Math.max(1, adults - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
-                        <span className="font-bold w-4 text-center text-sm">{adults}</span>
+                      <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <button onClick={() => setAdults(Math.max(1, adults - 1))} className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs">-</button>
+                        <span className="font-bold w-4 text-center text-xs">{adults}</span>
                         <button 
                           onClick={() => {
                             if (adults + children < maxSlots) {
@@ -799,7 +845,7 @@ export default function TourDetailPage() {
                             }
                           }} 
                           disabled={isMaxReached}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           +
                         </button>
@@ -809,12 +855,12 @@ export default function TourDetailPage() {
                     {/* Children Counter */}
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-bold text-slate-800 text-sm">Trẻ em</p>
-                        <p className="text-[11px] text-slate-400 font-medium">2 - 11 tuổi (-30%)</p>
+                        <p className="font-bold text-slate-800 text-xs">Trẻ em</p>
+                        <p className="text-[10px] text-slate-400 font-medium">2 - 11 tuổi (-30%)</p>
                       </div>
-                      <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                        <button onClick={() => setChildren(Math.max(0, children - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
-                        <span className="font-bold w-4 text-center text-sm">{children}</span>
+                      <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <button onClick={() => setChildren(Math.max(0, children - 1))} className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs">-</button>
+                        <span className="font-bold w-4 text-center text-xs">{children}</span>
                         <button 
                           onClick={() => {
                             if (adults + children < maxSlots) {
@@ -822,7 +868,7 @@ export default function TourDetailPage() {
                             }
                           }} 
                           disabled={isMaxReached}
-                          className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           +
                         </button>
@@ -832,7 +878,7 @@ export default function TourDetailPage() {
 
                   <button
                     onClick={handleBooking}
-                    className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-sky-600 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100 mb-4 text-sm tracking-wide"
+                    className="w-full py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-sky-600 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100 mb-3 text-xs tracking-wide"
                     disabled={!selectedScheduleId}
                   >
                     {selectedScheduleId ? "Đặt hành trình ngay" : "Chọn ngày khởi hành"}
@@ -850,27 +896,27 @@ export default function TourDetailPage() {
                     }
                   }));
                 }}
-                className="w-full py-3.5 bg-sky-50 hover:bg-sky-100 text-sky-600 font-bold rounded-2xl active:scale-[0.98] transition-all mb-4 text-sm tracking-wide flex items-center justify-center gap-2 border border-sky-100 shadow-sm cursor-pointer"
+                className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-600 font-bold rounded-xl active:scale-[0.98] transition-all mb-3 text-xs tracking-wide flex items-center justify-center gap-1.5 border border-sky-100 shadow-sm cursor-pointer"
               >
                 💬 Nhận tư vấn về tour này
               </button>
               
-              <button className="w-full py-3 text-slate-400 font-bold text-xs hover:text-rose-500 transition-colors uppercase tracking-widest">
+              <button className="w-full py-2 text-slate-400 font-bold text-[10px] hover:text-rose-500 transition-colors uppercase tracking-widest">
                 ♥ Lưu vào mục yêu thích
               </button>
 
-              <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between gap-4">
+              <div className="mt-6 pt-4 border-t border-slate-50 flex justify-between gap-3">
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg">🛡️</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Bảo mật thanh toán</span>
+                  <span className="text-base">🛡️</span>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Bảo mật thanh toán</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg">↩️</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Hủy tour linh hoạt</span>
+                  <span className="text-base">↩️</span>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Hủy tour linh hoạt</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg">⚡</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Xác nhận ngay</span>
+                  <span className="text-base">⚡</span>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Xác nhận ngay</span>
                 </div>
               </div>
             </div>
