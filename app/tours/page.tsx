@@ -20,6 +20,8 @@ const TOUR_TYPE_LABELS: Record<string, string> = {
   CULTURAL: "Văn hóa",
   ADVENTURE: "Phiêu lưu",
   ECO: "Sinh thái",
+  JOIN_IN: "Ghép đoàn",
+  PRIVATE: "Tour riêng",
 };
 
 const VEHICLE_LABELS: Record<string, string> = {
@@ -42,6 +44,43 @@ function getPriceRange(range: string | null): [number, number] {
 }
 
 
+interface CollapsePanelProps {
+  title: string;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}
+
+function CollapsePanel({ title, isOpen, onToggle, children }: CollapsePanelProps) {
+  return (
+    <div className="border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between py-1.5 text-xs font-semibold text-slate-800 hover:text-sky-600 transition text-left cursor-pointer"
+      >
+        <span>{title}</span>
+        <svg
+          className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      <div
+        className={`transition-all duration-200 overflow-hidden ${
+          isOpen ? "max-h-[500px] opacity-100 mt-2" : "max-h-0 opacity-0 pointer-events-none"
+        }`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export default function ToursPage() {
   const [allTours, setAllTours] = useState<TourDTO[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,6 +89,23 @@ export default function ToursPage() {
 
   const searchParams = useSearchParams();
   const [selectedGeo, setSelectedGeo] = useState<"all" | "domestic" | "international">("all");
+
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    geo: true,      // Địa lý
+    type: true,     // Loại tour
+    price: false,   // Ngân sách
+    startDest: false,// Điểm khởi hành
+    vehicle: false, // Phương tiện
+    date: false,    // Ngày đi
+    sort: false,    // Sắp xếp
+  });
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
 
   // Search & Filter
   const [searchTerm, setSearchTerm] = useState("");
@@ -259,12 +315,15 @@ export default function ToursPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* ── Sidebar Filter ── */}
             <aside className="lg:col-span-1">
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm space-y-6 sticky top-24">
+              <div className="bg-white rounded-2xl p-3.5 border border-gray-100 shadow-sm space-y-4 sticky top-24">
 
                 {/* Phân loại địa lý */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Phân loại địa lý</h3>
-                  <div className="flex flex-wrap gap-2">
+                <CollapsePanel
+                  title="Phân loại địa lý"
+                  isOpen={expandedSections.geo}
+                  onToggle={() => toggleSection("geo")}
+                >
+                  <div className="flex flex-wrap gap-1.5">
                     {[
                       { label: "Tất cả", value: "all" as const },
                       { label: "Trong nước", value: "domestic" as const },
@@ -279,7 +338,7 @@ export default function ToursPage() {
                         <button
                           key={geo.value}
                           onClick={() => setSelectedGeo(geo.value)}
-                          className={`px-3 py-1.5 text-xs rounded-full transition ${selectedGeo === geo.value
+                          className={`px-2 py-1 text-[10px] rounded-full transition ${selectedGeo === geo.value
                             ? "bg-sky-600 text-white"
                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                             }`}>
@@ -288,15 +347,18 @@ export default function ToursPage() {
                       );
                     })}
                   </div>
-                </div>
+                </CollapsePanel>
 
                 {/* Tour Type */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Loại tour</h3>
-                  <div className="flex flex-wrap gap-2">
+                <CollapsePanel
+                  title="Loại tour"
+                  isOpen={expandedSections.type}
+                  onToggle={() => toggleSection("type")}
+                >
+                  <div className="flex flex-wrap gap-1.5">
                     <button
                       onClick={() => setSelectedType(null)}
-                      className={`px-3 py-1.5 text-xs rounded-full transition ${selectedType === null
+                      className={`px-2 py-1 text-[10px] rounded-full transition ${selectedType === null
                         ? "bg-sky-600 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                         }`}>
@@ -309,7 +371,7 @@ export default function ToursPage() {
                         <button
                           key={type}
                           onClick={() => setSelectedType(selectedType === type ? null : type)}
-                          className={`px-3 py-1.5 text-xs rounded-full transition ${selectedType === type
+                          className={`px-2 py-1 text-[10px] rounded-full transition ${selectedType === type
                             ? "bg-sky-600 text-white"
                             : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                             }`}>
@@ -318,12 +380,15 @@ export default function ToursPage() {
                       );
                     })}
                   </div>
-                </div>
+                </CollapsePanel>
 
                 {/* Price */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">Ngân sách</h3>
-                  <div className="flex flex-wrap gap-2">
+                <CollapsePanel
+                  title="Ngân sách"
+                  isOpen={expandedSections.price}
+                  onToggle={() => toggleSection("price")}
+                >
+                  <div className="flex flex-wrap gap-1.5">
                     {[
                       { label: "Tất cả", value: null },
                       { label: "Dưới 5tr", value: "under-5" },
@@ -334,7 +399,7 @@ export default function ToursPage() {
                       <button
                         key={item.label}
                         onClick={() => setPriceRange(item.value as any)}
-                        className={`px-3 py-1.5 text-xs rounded-full transition ${priceRange === item.value
+                        className={`px-2 py-1 text-[10px] rounded-full transition ${priceRange === item.value
                           ? "bg-sky-600 text-white"
                           : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                           }`}>
@@ -342,32 +407,38 @@ export default function ToursPage() {
                       </button>
                     ))}
                   </div>
-                </div>
+                </CollapsePanel>
 
                 {/* Destination */}
                 {destinations.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Điểm khởi hành</h3>
+                  <CollapsePanel
+                    title="Điểm khởi hành"
+                    isOpen={expandedSections.startDest}
+                    onToggle={() => toggleSection("startDest")}
+                  >
                     <select
                       value={selectedDestination ?? ""}
                       onChange={(e) => setSelectedDestination(e.target.value || null)}
-                      className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
+                      className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
                       <option value="">Tất cả</option>
                       {destinations.map(dest => (
                         <option key={dest} value={dest}>{dest}</option>
                       ))}
                     </select>
-                  </div>
+                  </CollapsePanel>
                 )}
 
                 {/* Vehicle */}
                 {vehicleTypes.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Phương tiện</h3>
+                  <CollapsePanel
+                    title="Phương tiện"
+                    isOpen={expandedSections.vehicle}
+                    onToggle={() => toggleSection("vehicle")}
+                  >
                     <select
                       value={selectedVehicle ?? ""}
                       onChange={(e) => setSelectedVehicle(e.target.value || null)}
-                      className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
+                      className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
                       <option value="">Tất cả</option>
                       {vehicleTypes.map(vehicle => (
                         <option key={vehicle} value={vehicle}>
@@ -375,41 +446,41 @@ export default function ToursPage() {
                         </option>
                       ))}
                     </select>
-                  </div>
+                  </CollapsePanel>
                 )}
 
                 {/* Date */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Ngày đi</h3>
+                <CollapsePanel
+                  title="Ngày đi"
+                  isOpen={expandedSections.date}
+                  onToggle={() => toggleSection("date")}
+                >
                   <div className="flex gap-2">
                     <input
                       type="date"
                       value={startDateFrom}
                       onChange={(e) => setStartDateFrom(e.target.value)}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
+                      className="w-full text-xs px-2 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
                     />
-                    {/* <input
-                      type="date"
-                      value={startDateTo}
-                      onChange={(e) => setStartDateTo(e.target.value)}
-                      className="w-full text-sm px-2 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                    /> */}
                   </div>
-                </div>
+                </CollapsePanel>
 
                 {/* Sort */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-2">Sắp xếp</h3>
+                <CollapsePanel
+                  title="Sắp xếp"
+                  isOpen={expandedSections.sort}
+                  onToggle={() => toggleSection("sort")}
+                >
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                    className="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
+                    className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
                     <option value="rating">Đánh giá cao</option>
                     <option value="price-asc">Giá thấp</option>
                     <option value="price-desc">Giá cao</option>
                     <option value="available">Còn chỗ</option>
                   </select>
-                </div>
+                </CollapsePanel>
 
                 {/* Reset */}
                 <button
@@ -424,7 +495,7 @@ export default function ToursPage() {
                     setSortBy("rating");
                     setSelectedGeo("all");
                   }}
-                  className="w-full text-sm py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition">
+                  className="w-full text-xs py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition">
                   Xóa bộ lọc
                 </button>
 

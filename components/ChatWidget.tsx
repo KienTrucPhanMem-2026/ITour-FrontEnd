@@ -472,11 +472,18 @@ export default function ChatWidget({
     e.preventDefault();
     if (!fullName.trim()) return;
 
-    checkAndSetupLazySession({
+    const payload = {
       fullName: fullName.trim(),
       email: email.trim() || undefined,
       phone: phone.trim() || undefined,
-    });
+    };
+
+    if (tourContext) {
+      const contentText = `[TOUR_LINK:tourId=${tourContext.tourId}&name=${tourContext.tourName}&price=${tourContext.tourPrice}]`;
+      initiateChatSession({ ...payload, tourId: tourContext.tourId }, contentText);
+    } else {
+      checkAndSetupLazySession(payload);
+    }
   };
 
   const handleSendMessage = async () => {
@@ -738,14 +745,16 @@ export default function ChatWidget({
         } else if (storedUser) {
           const userId = storedUser.id || storedUser.userId;
           const fullName = storedUser.fullName || storedUser.name || storedUser.userName || "Khách hàng";
+          const contentText = `[TOUR_LINK:tourId=${detail.tourId}&name=${detail.tourName}&price=${detail.tourPrice}]`;
           await initiateChatSession({
             userId,
             fullName,
             email: storedUser.email || undefined,
             phone: storedUser.phone || undefined,
             tourId: detail.tourId,
-          } as any);
+          } as any, contentText);
         } else if (storedCustomer) {
+          const contentText = `[TOUR_LINK:tourId=${detail.tourId}&name=${detail.tourName}&price=${detail.tourPrice}]`;
           await initiateChatSession({
             chatCustomerId: storedCustomer.id,
             fullName: storedCustomer.fullName,
@@ -753,7 +762,7 @@ export default function ChatWidget({
             phone: storedCustomer.phone,
             sessionId: storedCustomer.sessionId,
             tourId: detail.tourId,
-          } as any);
+          } as any, contentText);
         } else {
           setShowPreChatForm(true);
         }

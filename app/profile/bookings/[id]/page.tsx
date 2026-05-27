@@ -11,6 +11,7 @@ import {
 } from "@/lib/api/bookings";
 import { getTourByIdAPI } from "@/lib/api/tours";
 import { getStoredUser } from "@/lib/auth";
+import { getReviewByBookingAPI, createReviewAPI } from "@/lib/api/reviews";
 import { useBookingTimer } from "@/hooks/useBookingTimer";
 import {
   ArrowLeft, Users, Clock, AlertCircle, MapPin, Star,
@@ -392,6 +393,15 @@ export default function BookingDetailPage() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Review states
+  const [review, setReview] = useState<any | null>(null);
+  const [tourRating, setTourRating] = useState<number>(5);
+  const [tourComment, setTourComment] = useState("");
+  const [guideRating, setGuideRating] = useState<number>(5);
+  const [guideComment, setGuideComment] = useState("");
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const reviewRef = useRef<HTMLDivElement>(null);
+
   // Collapse state
   const [passengerForm, setPassengerForm] = useState<PassengerFormItem[]>([]);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
@@ -441,6 +451,14 @@ export default function BookingDetailPage() {
         setBookingDto(dto);
         const tourData = await getTourByIdAPI(dto.tourId);
         setTour(tourData);
+        if (dto.reviewed) {
+          try {
+            const reviewData = await getReviewByBookingAPI(bookingId);
+            setReview(reviewData);
+          } catch (err) {
+            console.error("Lỗi khi tải review:", err);
+          }
+        }
       }
     } catch (err: any) {
       setError(err.message || "Không thể tải chi tiết đơn hàng.");
@@ -454,6 +472,42 @@ export default function BookingDetailPage() {
     if (!user) { router.push("/login"); return; }
     if (id) loadDetails(id, user.id);
   }, [id, loadDetails]);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    if (searchParams.get("openReview") === "true") {
+      const timer = setTimeout(() => {
+        reviewRef.current?.scrollIntoView({ behavior: "smooth" });
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [bookingDto]);
+
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!booking) return;
+    setSubmittingReview(true);
+    try {
+      const payload = {
+        customerId: booking.customer.id,
+        bookingId: booking.id,
+        tourRating,
+        tourComment: tourComment.trim(),
+        guideRating: bookingDto?.tourGuideId ? guideRating : undefined,
+        guideComment: bookingDto?.tourGuideId ? guideComment.trim() : undefined,
+      };
+      const createdReview = await createReviewAPI(payload);
+      showToast("Đánh giá của bạn đã được gửi thành công!", "success");
+      setReview(createdReview);
+      
+      // Update bookingDto reviewed status locally to prevent form showing
+      setBookingDto((prev: any) => prev ? { ...prev, reviewed: true } : null);
+    } catch (err: any) {
+      showToast(err.message || "Không thể gửi đánh giá. Vui lòng thử lại sau.", "error");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   // ── passenger actions ──
   const handleChange = (idx: number, field: string, value: string) => {
@@ -767,6 +821,142 @@ export default function BookingDetailPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Review Section */}
+            {bookingDto?.status === "COMPLETED" && (
+              <div ref={reviewRef} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 space-y-6">
+                <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                  <span>★</span> Đánh giá chuyến đi của bạn
+                </h3>
+                
+                {bookingDto.reviewed && review ? (
+                  // Review was submitted, show it in readonly view
+                  <div className="space-y-4">
+                    <p className="text-xs text-slate-500 font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl px-4 py-3">
+                      ✓ Bạn đã gửi đánh giá cho chuyến đi này. Cảm ơn phản hồi của bạn!
+                    </p>
+                    
+                    {/* Tour Rating Display */}
+                    <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
+                      <h4 className="text-sm font-bold text-slate-800 mb-2">Đánh giá của bạn về Tour</h4>
+                      <div className="flex gap-1 mb-2">
+                        {Array.from({ length: 5 }).map((_, star) => (
+                          <span
+                            key={star}
+                            className={`text-xl ${star < (review.tourRating || review.rating || 0) ? "text-yellow-400" : "text-gray-200"}`}
+                          >
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      {review.tourComment || review.comment ? (
+                        <p className="text-sm text-slate-600 font-medium italic">"{review.tourComment || review.comment}"</p>
+                      ) : (
+                        <p className="text-xs text-slate-400">Không có bình luận cho Tour</p>
+                      )}
+                    </div>
+
+                    {/* Guide Rating Display */}
+                    {bookingDto.tourGuideName && (review.guideRating != null) && (
+                      <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
+                        <h4 className="text-sm font-bold text-slate-800 mb-2">Đánh giá Hướng dẫn viên: <span className="text-sky-600 font-extrabold">{bookingDto.tourGuideName}</span></h4>
+                        <div className="flex gap-1 mb-2">
+                          {Array.from({ length: 5 }).map((_, star) => (
+                            <span
+                              key={star}
+                              className={`text-xl ${star < (review.guideRating || 0) ? "text-yellow-400" : "text-gray-200"}`}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        {review.guideComment ? (
+                          <p className="text-sm text-slate-600 font-medium italic">"{review.guideComment}"</p>
+                        ) : (
+                          <p className="text-xs text-slate-400">Không có bình luận cho Hướng dẫn viên</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Review form to submit
+                  <form onSubmit={handleReviewSubmit} className="space-y-6">
+                    {/* Tour Rating Stars & Comment */}
+                    <div className="space-y-3">
+                      <label className="block text-sm font-black text-slate-700">
+                        1. Bạn đánh giá chất lượng Tour này thế nào?
+                      </label>
+                      <div className="flex gap-1.5">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <button
+                            key={star}
+                            type="button"
+                            onClick={() => setTourRating(star)}
+                            className={`text-3xl transition-all hover:scale-110 ${star <= tourRating ? "text-yellow-400" : "text-slate-200"}`}
+                          >
+                            ★
+                          </button>
+                        ))}
+                      </div>
+                      <textarea
+                        value={tourComment}
+                        onChange={(e) => setTourComment(e.target.value)}
+                        placeholder="Chia sẻ trải nghiệm của bạn về tour diễn ra như thế nào..."
+                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm font-semibold outline-none transition-all resize-none"
+                        rows={3}
+                        maxLength={500}
+                      />
+                    </div>
+
+                    {/* Guide Rating Stars & Comment */}
+                    {bookingDto?.tourGuideName && (
+                      <div className="space-y-3 border-t border-slate-50 pt-4">
+                        <label className="block text-sm font-black text-slate-700">
+                          2. Đánh giá Hướng dẫn viên: <span className="text-sky-600">{bookingDto.tourGuideName}</span>
+                        </label>
+                        <div className="flex gap-1.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setGuideRating(star)}
+                              className={`text-3xl transition-all hover:scale-110 ${star <= guideRating ? "text-yellow-400" : "text-slate-200"}`}
+                            >
+                              ★
+                            </button>
+                          ))}
+                        </div>
+                        <textarea
+                          value={guideComment}
+                          onChange={(e) => setGuideComment(e.target.value)}
+                          placeholder="Nhận xét về thái độ, nghiệp vụ của hướng dẫn viên..."
+                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm font-semibold outline-none transition-all resize-none"
+                          rows={3}
+                          maxLength={500}
+                        />
+                      </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={submittingReview}
+                        className="px-6 py-2.5 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all shadow-md shadow-sky-100 flex items-center gap-1.5"
+                      >
+                        {submittingReview ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            Đang gửi...
+                          </>
+                        ) : (
+                          "Gửi đánh giá"
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             )}
           </div>

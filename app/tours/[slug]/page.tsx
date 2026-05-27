@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTourByIdAPI, getTourItinerariesAPI } from "@/lib/api/tours";
 import { getStoredUser } from "@/lib/auth";
-import { getMyBookingsAPI } from "@/lib/api/bookings";
+import { getMyBookingsAPI, createBookingAPI } from "@/lib/api/bookings";
 import ReviewList from "@/components/ReviewList";
 import ReviewForm from "@/components/ReviewForm";
 import type { TourDTO, UserProfile } from "@/types/api";
@@ -25,6 +25,53 @@ interface TourItinerary {
   title: string;
   description?: string;
   itineraryDetails: ItineraryDetail[];
+}
+
+type ToastType = "success" | "error" | "info";
+interface ToastItem { id: number; type: ToastType; message: string }
+
+function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
+  const icons: Record<ToastType, React.ReactNode> = {
+    success: (
+      <svg className="w-4 h-4 text-emerald-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    error: (
+      <svg className="w-4 h-4 text-rose-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    info: (
+      <svg className="w-4 h-4 text-sky-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  };
+  const borders: Record<ToastType, string> = {
+    success: "border-l-4 border-l-emerald-400",
+    error:   "border-l-4 border-l-rose-400",
+    info:    "border-l-4 border-l-sky-400",
+  };
+  return (
+    <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 340 }}>
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={`flex items-center gap-2.5 px-4 py-3 rounded-xl border border-slate-100 shadow-2xl shadow-slate-300/40 bg-white text-sm font-semibold text-slate-800 pointer-events-auto ${borders[t.type]}`}
+          style={{ animation: "slideInRight 0.25s ease" }}
+        >
+          {icons[t.type]}
+          <span className="flex-grow leading-snug text-xs">{t.message}</span>
+          <button onClick={() => onDismiss(t.id)} className="text-slate-300 hover:text-slate-600 transition-colors ml-1 shrink-0">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // ─── Helpers ─────────────────────────
@@ -55,6 +102,26 @@ export default function TourDetailPage() {
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
+  const [infants, setInfants] = useState(0);
+  const [specialNote, setSpecialNote] = useState("");
+  const [departureDate, setDepartureDate] = useState("");
+  const [submittingBooking, setSubmittingBooking] = useState(false);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const [showGuestPopover, setShowGuestPopover] = useState(false);
+  const guestPopoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (guestPopoverRef.current && !guestPopoverRef.current.contains(event.target as Node)) {
+        setShowGuestPopover(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   const [selectedImage, setSelectedImage] = useState(0);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [reviewRefresh, setReviewRefresh] = useState(0);
@@ -63,6 +130,19 @@ export default function TourDetailPage() {
   const [itineraries, setItineraries] = useState<TourItinerary[]>([]);
   const [loadingItineraries, setLoadingItineraries] = useState(true);
   const [selectedDayNumber, setSelectedDayNumber] = useState<number>(1);
+
+  const showToast = (message: string, type: ToastType = "info", duration = 5000) => {
+    const id = Date.now() + Math.random();
+    setToasts((p) => [...p, { id, type, message }]);
+    setTimeout(() => setToasts((p) => p.filter((t) => t.id !== id)), duration);
+  };
+  const dismissToast = (id: number) => setToasts((p) => p.filter((t) => t.id !== id));
+
+  const getMinDepartureDate = () => {
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() + 3);
+    return minDate.toISOString().split("T")[0];
+  };
 
   const schedules = tour?.schedules || [];
   const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
@@ -162,9 +242,112 @@ export default function TourDetailPage() {
     router.push(`/payment?${params.toString()}`);
   };
 
-  const hasBookedThisTour = userBookings.some(
-    (booking) => booking.tourId === tourId && booking.status !== "cancelled"
-  );
+  const isPrivate = tour?.tourType === "PRIVATE";
+
+  const privatePricing = useMemo(() => {
+    if (!isPrivate || !tour) return null;
+    const totalGuests = adults + children;
+    const tiers = tour.pricingTiers || [];
+    const matchedTier = tiers.find(
+      (tier) => totalGuests >= tier.minPax && totalGuests <= tier.maxPax
+    );
+
+    if (!matchedTier) {
+      return {
+        matched: false,
+        pricePerAdult: 0,
+        pricePerChild: 0,
+        totalPrice: 0,
+        message: `Khung giá riêng của tour yêu cầu từ ${
+          tiers.length > 0 ? Math.min(...tiers.map(t => t.minPax)) : 1
+        } đến ${
+          tiers.length > 0 ? Math.max(...tiers.map(t => t.maxPax)) : 50
+        } khách. Vui lòng chọn lại số lượng khách.`,
+      };
+    }
+
+    const pricePerAdult = matchedTier.pricePerAdult;
+    const pricePerChild = matchedTier.pricePerChild ?? pricePerAdult * 0.7;
+    const total = pricePerAdult * adults + pricePerChild * children;
+
+    return {
+      matched: true,
+      pricePerAdult,
+      pricePerChild,
+      totalPrice: total,
+      minPax: matchedTier.minPax,
+      maxPax: matchedTier.maxPax,
+    };
+  }, [isPrivate, tour, adults, children]);
+
+  const handlePrivateBooking = async () => {
+    const currentUser = getStoredUser();
+    if (!currentUser) {
+      const currentUrl = window.location.pathname + window.location.search;
+      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+      return;
+    }
+
+    if (!departureDate) {
+      showToast("Vui lòng chọn ngày khởi hành!", "error");
+      return;
+    }
+
+    if (!privatePricing || !privatePricing.matched) {
+      showToast("Số lượng khách không phù hợp với các khung giá tour riêng. Vui lòng thay đổi số lượng khách!", "error");
+      return;
+    }
+
+    // Lấy template schedule đầu tiên của tour
+    const baseScheduleId = tour?.schedules?.[0]?.id;
+    if (!baseScheduleId) {
+      showToast("Hệ thống chưa thiết lập lịch trình mẫu cho tour này. Vui lòng quay lại sau!", "error");
+      return;
+    }
+
+    try {
+      setSubmittingBooking(true);
+      
+      const payload = {
+        customerId: currentUser.id || "",
+        tourId: tour?.id || "",
+        tourScheduleId: baseScheduleId,
+        adults: adults,
+        children: children,
+        paymentMethod: "MOMO" as const, // default payment method
+        departureDate: departureDate,
+        note: specialNote,
+      };
+
+      const result = await createBookingAPI(payload);
+      
+      showToast(result.message || "Yêu cầu của bạn đã được gửi thành công. Chuyên viên của ITour sẽ liên hệ và xác nhận lịch trình trong vòng 24h tới.", "success");
+      
+      // Chuyển hướng sang trang profile sau 3 giây để người dùng đọc thông báo
+      setTimeout(() => {
+        router.push("/profile");
+      }, 3000);
+    } catch (err: any) {
+      console.error("Lỗi đặt tour riêng:", err);
+      showToast(err.message || "Có lỗi xảy ra khi gửi yêu cầu đặt tour. Vui lòng thử lại!", "error");
+    } finally {
+      setSubmittingBooking(false);
+    }
+  };
+
+  const tourBookings = useMemo(() => {
+    return userBookings.filter(
+      (booking) => booking.tourId === tourId && booking.status?.toUpperCase() !== "CANCELLED"
+    );
+  }, [userBookings, tourId]);
+
+  const [unreviewedBookings, setUnreviewedBookings] = useState<any[]>([]);
+
+  useEffect(() => {
+    setUnreviewedBookings(tourBookings.filter((b) => !b.reviewed));
+  }, [tourBookings]);
+
+  const hasBookedThisTour = tourBookings.length > 0;
 
   if (loadingTour) return <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>;
   if (error || !tour) return <div className="p-20 text-center text-red-500 font-bold">{error || "Tour không tồn tại"}</div>;
@@ -218,52 +401,81 @@ export default function TourDetailPage() {
             <hr className="my-10 border-slate-100" />
 
             {/* Schedules Section */}
-            <section className="mb-12">
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
-                Lịch khởi hành 
-                <span className="text-sm font-normal text-slate-400 font-medium">(Chọn ngày để đặt tour)</span>
-              </h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {schedules.map((schedule) => {
-                  const isSelected = selectedScheduleId === schedule.id;
-                  const isFull = (schedule.availableSlot ?? 0) <= 0;
-                  return (
-                    <button
-                      key={schedule.id}
-                      onClick={() => {
-                        if (!isFull) {
-                          setSelectedScheduleId(schedule.id);
-                          const maxSlotsVal = schedule.availableSlot ?? 0;
-                          if (adults + children > maxSlotsVal) {
-                            const newAdults = Math.min(adults, Math.max(1, maxSlotsVal));
-                            const newChildren = Math.min(children, Math.max(0, maxSlotsVal - newAdults));
-                            setAdults(newAdults);
-                            setChildren(newChildren);
+            {isPrivate ? (
+              <section className="mb-12 p-8 bg-sky-50/40 rounded-3xl border border-sky-100/60 shadow-sm">
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2.5 text-slate-800">
+                  ✨ Lịch trình khởi hành linh hoạt
+                </h2>
+                <p className="text-slate-600 text-sm leading-relaxed mb-6">
+                  Tour này được tổ chức dưới hình thức <strong className="text-sky-600 font-semibold">Tour riêng (Private Tour)</strong>. 
+                  Bạn hoàn toàn chủ động chọn ngày đi mong muốn và số lượng khách tham gia. Chúng tôi sẽ điều phối xe riêng và hướng dẫn viên riêng phục vụ hành trình của đoàn.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-semibold text-slate-700">
+                  <div className="flex flex-col gap-1 p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+                    <span className="text-lg">🚗</span>
+                    <span className="font-bold text-slate-900">Xe đưa đón riêng</span>
+                    <span className="text-[10px] text-slate-400 font-medium leading-tight">Xe riêng cao cấp suốt hành trình</span>
+                  </div>
+                  <div className="flex flex-col gap-1 p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+                    <span className="text-lg">🙋</span>
+                    <span className="font-bold text-slate-900">Hướng dẫn viên riêng</span>
+                    <span className="text-[10px] text-slate-400 font-medium leading-tight">Chăm sóc chu đáo suốt chuyến đi</span>
+                  </div>
+                  <div className="flex flex-col gap-1 p-4 bg-white rounded-2xl shadow-sm border border-slate-100">
+                    <span className="text-lg">🏨</span>
+                    <span className="font-bold text-slate-900">Dịch vụ may đo</span>
+                    <span className="text-[10px] text-slate-400 font-medium leading-tight">Tùy chỉnh khách sạn, thực đơn dễ dàng</span>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section className="mb-12">
+                <h2 className="text-2xl font-bold mb-6 flex items-center gap-3">
+                  Lịch khởi hành 
+                  <span className="text-sm font-normal text-slate-400 font-medium">(Chọn ngày để đặt tour)</span>
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {schedules.map((schedule) => {
+                    const isSelected = selectedScheduleId === schedule.id;
+                    const isFull = (schedule.availableSlot ?? 0) <= 0;
+                    return (
+                      <button
+                        key={schedule.id}
+                        onClick={() => {
+                          if (!isFull) {
+                            setSelectedScheduleId(schedule.id);
+                            const maxSlotsVal = schedule.availableSlot ?? 0;
+                            if (adults + children > maxSlotsVal) {
+                              const newAdults = Math.min(adults, Math.max(1, maxSlotsVal));
+                              const newChildren = Math.min(children, Math.max(0, maxSlotsVal - newAdults));
+                              setAdults(newAdults);
+                              setChildren(newChildren);
+                            }
                           }
-                        }
-                      }}
-                      disabled={isFull}
-                      className={`p-5 rounded-2xl border-2 transition-all text-left relative group ${
-                        isFull ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-100" :
-                        isSelected ? "border-sky-500 bg-sky-50/50 ring-4 ring-sky-50 shadow-sm" : "border-slate-100 hover:border-sky-200"
-                      }`}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest">Khởi hành</span>
-                        <span className="font-bold text-slate-900 text-lg">{formatDate(schedule.startDate)}</span>
-                        <span className={`text-xs font-bold ${isFull ? "text-rose-500" : "text-emerald-600"}`}>
-                          {isFull ? "● Đã hết chỗ" : `● Còn ${schedule.availableSlot} chỗ trống`}
-                        </span>
-                        <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-end">
-                           <span className="text-xs text-slate-400 font-medium font-mono tracking-tighter uppercase">Giá từ</span>
-                           <span className="text-xl font-black text-emerald-500">{formatPrice(schedule.price || tour.price)}</span>
+                        }}
+                        disabled={isFull}
+                        className={`p-5 rounded-2xl border-2 transition-all text-left relative group ${
+                          isFull ? "opacity-50 cursor-not-allowed bg-slate-50 border-slate-100" :
+                          isSelected ? "border-sky-500 bg-sky-50/50 ring-4 ring-sky-50 shadow-sm" : "border-slate-100 hover:border-sky-200"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-bold text-sky-600 uppercase tracking-widest">Khởi hành</span>
+                          <span className="font-bold text-slate-900 text-lg">{formatDate(schedule.startDate)}</span>
+                          <span className={`text-xs font-bold ${isFull ? "text-rose-500" : "text-emerald-600"}`}>
+                            {isFull ? "● Đã hết chỗ" : `● Còn ${schedule.availableSlot} chỗ trống`}
+                          </span>
+                          <div className="mt-3 pt-3 border-t border-slate-100 flex justify-between items-end">
+                             <span className="text-xs text-slate-400 font-medium font-mono tracking-tighter uppercase">Giá từ</span>
+                             <span className="text-xl font-black text-emerald-500">{formatPrice(schedule.price || tour.price)}</span>
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
             <hr className="my-10 border-slate-100" />
 
@@ -386,11 +598,22 @@ export default function TourDetailPage() {
                   Đang kiểm tra booking...
                 </div>
               ) : hasBookedThisTour ? (
-                <ReviewForm
-                  tourId={tour.id}
-                  customerId={currentUser.id || ""}
-                  onSuccess={() => setReviewRefresh((prev) => prev + 1)}
-                />
+                unreviewedBookings.length > 0 ? (
+                  <ReviewForm
+                    tourId={tour.id}
+                    customerId={currentUser.id || ""}
+                    unreviewedBookings={unreviewedBookings}
+                    onSuccess={(bookingId) => {
+                      setUnreviewedBookings((prev) => prev.filter((b) => b.bookingId !== bookingId));
+                      setReviewRefresh((prev) => prev + 1);
+                    }}
+                  />
+                ) : (
+                  <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                    <p className="text-emerald-900 font-bold mb-1.5">✓ Đã hoàn tất đánh giá</p>
+                    <p className="text-emerald-700 text-xs font-medium">Bạn đã hoàn thành đánh giá cho tất cả {tourBookings.length} chuyến đi của tour này. Cảm ơn bạn!</p>
+                  </div>
+                )
               ) : (
                 <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl text-center">
                   <p className="text-amber-900 font-medium mb-2">📋 Bạn phải đặt tour này trước khi có thể đánh giá</p>
@@ -406,82 +629,283 @@ export default function TourDetailPage() {
             </section>
 
             <hr className="my-10 border-slate-100" />
-
-           
           </div>
 
           {/* Right Column: Booking Card */}
           <aside className="lg:col-span-1">
-            <div className="sticky top-28 bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-2xl shadow-slate-200/50">
-              <div className="mb-6">
-                <span className="text-slate-400 text-xs font-bold uppercase tracking-widest block mb-2">Giá tạm tính</span>
-                <span className="text-3xl font-black text-slate-900 tracking-tight">{formatPrice(totalPrice)}</span>
-              </div>
+            <div className="sticky top-28 bg-white rounded-3xl p-5 md:p-6 border border-slate-100 shadow-2xl shadow-slate-200/50">
+              
+              {isPrivate ? (
+                /* ----------------- Private Tour Booking Card ----------------- */
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest block mb-0.5">Dịch vụ Tour riêng</span>
+                    <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Yêu cầu Đặt Tour Riêng</h3>
+                  </div>
 
-              {selectedSchedule && (
-                <div className="mb-6 p-3.5 bg-sky-50/70 rounded-2xl border border-sky-100/50 flex items-center justify-between text-xs text-sky-700 font-medium">
-                  <span>Số chỗ còn lại:</span>
-                  <span className="font-bold text-xs bg-white px-2.5 py-1.5 rounded-xl border border-sky-100/30 shadow-sm text-sky-800">
-                    {selectedSchedule.availableSlot} chỗ
-                  </span>
+                  {/* Input 1: Departure Date picker */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ngày khởi hành *</label>
+                    <input
+                      type="date"
+                      min={getMinDepartureDate()}
+                      value={departureDate}
+                      onChange={(e) => setDepartureDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs font-semibold text-slate-800"
+                    />
+                    <p className="text-[9px] text-slate-400 font-medium">Chọn ngày khởi hành (tối thiểu sau 3 ngày nữa)</p>
+                  </div>
+
+                  {/* Input 2: Guest Selector via Popover */}
+                  <div className="space-y-1.5 relative" ref={guestPopoverRef}>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Số lượng hành khách *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowGuestPopover(!showGuestPopover)}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-xs font-semibold text-slate-800 text-left flex justify-between items-center cursor-pointer"
+                    >
+                      <span>
+                        {adults} Người lớn{children > 0 ? `, ${children} Trẻ em` : ""}{infants > 0 ? `, ${infants} Em bé` : ""}
+                      </span>
+                      <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${showGuestPopover ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {showGuestPopover && (
+                      <div className="absolute left-0 right-0 mt-2 bg-white rounded-2xl p-4 border border-slate-100 shadow-2xl shadow-slate-300/80 z-[100] space-y-3">
+                        {/* Adults */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">Người lớn</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Từ 12 tuổi trở lên</p>
+                          </div>
+                          <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setAdults(Math.max(1, adults - 1)); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold w-4 text-center text-xs">{adults}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setAdults(adults + 1); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Children */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">Trẻ em</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Từ 2 - 11 tuổi</p>
+                          </div>
+                          <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setChildren(Math.max(0, children - 1)); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold w-4 text-center text-xs">{children}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setChildren(children + 1); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Infants */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-bold text-slate-800 text-xs">Em bé</p>
+                            <p className="text-[10px] text-slate-400 font-medium">Dưới 2 tuổi (Miễn phí)</p>
+                          </div>
+                          <div className="flex items-center gap-3 bg-slate-50 p-1 rounded-lg border border-slate-100">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setInfants(Math.max(0, infants - 1)); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold w-4 text-center text-xs">{infants}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); setInfants(infants + 1); }}
+                              className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs cursor-pointer"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="pt-1.5 border-t border-slate-100 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setShowGuestPopover(false); }}
+                            className="px-3 py-1 bg-slate-900 text-white text-[10px] font-bold rounded-lg hover:bg-sky-600 transition-colors cursor-pointer"
+                          >
+                            Xác nhận
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dynamic Pricing Display */}
+                  <div className="pt-1.5">
+                    {privatePricing?.matched ? (
+                      <div className="space-y-2 p-3 bg-sky-50/40 rounded-xl border border-sky-100/50 text-[10px] text-slate-600">
+                        <div className="font-bold text-slate-700 mb-1 flex items-center gap-1">
+                          🏷️ Đơn giá nhóm (Bậc {privatePricing.minPax}-{privatePricing.maxPax} khách)
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Người lớn:</span>
+                          <span className="font-semibold text-slate-800">
+                            {adults} × {formatPrice(privatePricing.pricePerAdult)}
+                          </span>
+                        </div>
+                        {children > 0 && (
+                          <div className="flex justify-between">
+                            <span>Trẻ em (2-11t):</span>
+                            <span className="font-semibold text-slate-800">
+                              {children} × {formatPrice(privatePricing.pricePerChild)}
+                            </span>
+                          </div>
+                        )}
+                        {infants > 0 && (
+                          <div className="flex justify-between text-slate-400">
+                            <span>Em bé (&lt;2t):</span>
+                            <span>{infants} × Miễn phí</span>
+                          </div>
+                        )}
+                        <div className="border-t border-slate-200/60 pt-2 mt-1.5 flex justify-between font-bold text-slate-800 text-xs">
+                          <span>Tổng cộng ({adults + children} khách):</span>
+                          <span className="text-emerald-500 font-black text-sm">{formatPrice(privatePricing.totalPrice)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-[10px] text-rose-600 font-medium">
+                        ⚠️ {privatePricing?.message || "Không có khung giá phù hợp cho số lượng khách này."}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input 3: Special Notes */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ghi chú đặc biệt (Tùy chọn)</label>
+                    <textarea
+                      placeholder="VD: Gia đình có người già cần xe gầm thấp, đoàn muốn nâng cấp phòng lên khách sạn 4 sao..."
+                      value={specialNote}
+                      onChange={(e) => setSpecialNote(e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 text-[10px] font-medium text-slate-700 leading-relaxed resize-none"
+                    />
+                  </div>
+
+                  {/* CTA Button */}
+                  <button
+                    onClick={handlePrivateBooking}
+                    disabled={submittingBooking || !privatePricing?.matched}
+                    className="w-full py-2.5 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100/50 text-xs tracking-wide flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {submittingBooking ? (
+                      <>
+                        <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Đang gửi yêu cầu...
+                      </>
+                    ) : (
+                      "Gửi Yêu Cầu Đặt Tour"
+                    )}
+                  </button>
                 </div>
+              ) : (
+                /* ----------------- Standard Tour Booking Card ----------------- */
+                <>
+                  <div className="mb-4">
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-widest block mb-1">Giá tạm tính</span>
+                    <span className="text-2xl font-black text-slate-900 tracking-tight">{formatPrice(totalPrice)}</span>
+                  </div>
+
+                  {selectedSchedule && (
+                    <div className="mb-4 p-2.5 bg-sky-50/70 rounded-xl border border-sky-100/50 flex items-center justify-between text-[10px] text-sky-700 font-medium">
+                      <span>Số chỗ còn lại:</span>
+                      <span className="font-bold text-[10px] bg-white px-2 py-1 rounded-lg border border-sky-100/30 shadow-sm text-sky-800">
+                        {selectedSchedule.availableSlot} chỗ
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="space-y-4 mb-6">
+                    {/* Adults Counter */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-slate-800 text-xs">Người lớn</p>
+                        <p className="text-[10px] text-slate-400 font-medium">Trên 12 tuổi</p>
+                      </div>
+                      <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <button onClick={() => setAdults(Math.max(1, adults - 1))} className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs">-</button>
+                        <span className="font-bold w-4 text-center text-xs">{adults}</span>
+                        <button 
+                          onClick={() => {
+                            if (adults + children < maxSlots) {
+                              setAdults(adults + 1);
+                            }
+                          }} 
+                          disabled={isMaxReached}
+                          className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Children Counter */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-bold text-slate-800 text-xs">Trẻ em</p>
+                        <p className="text-[10px] text-slate-400 font-medium">2 - 11 tuổi (-30%)</p>
+                      </div>
+                      <div className="flex items-center gap-3 bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                        <button onClick={() => setChildren(Math.max(0, children - 1))} className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs">-</button>
+                        <span className="font-bold w-4 text-center text-xs">{children}</span>
+                        <button 
+                          onClick={() => {
+                            if (adults + children < maxSlots) {
+                              setChildren(children + 1);
+                            }
+                          }} 
+                          disabled={isMaxReached}
+                          className="w-6 h-6 rounded bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleBooking}
+                    className="w-full py-2.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-sky-600 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100 mb-3 text-xs tracking-wide"
+                    disabled={!selectedScheduleId}
+                  >
+                    {selectedScheduleId ? "Đặt hành trình ngay" : "Chọn ngày khởi hành"}
+                  </button>
+                </>
               )}
-
-              <div className="space-y-6 mb-10">
-                {/* Adults Counter */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-slate-800 text-sm">Người lớn</p>
-                    <p className="text-[11px] text-slate-400 font-medium">Trên 12 tuổi</p>
-                  </div>
-                  <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                    <button onClick={() => setAdults(Math.max(1, adults - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
-                    <span className="font-bold w-4 text-center text-sm">{adults}</span>
-                    <button 
-                      onClick={() => {
-                        if (adults + children < maxSlots) {
-                          setAdults(adults + 1);
-                        }
-                      }} 
-                      disabled={isMaxReached}
-                      className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-
-                {/* Children Counter */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-slate-800 text-sm">Trẻ em</p>
-                    <p className="text-[11px] text-slate-400 font-medium">2 - 11 tuổi (-30%)</p>
-                  </div>
-                  <div className="flex items-center gap-4 bg-slate-50 p-1.5 rounded-xl border border-slate-100">
-                    <button onClick={() => setChildren(Math.max(0, children - 1))} className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm">-</button>
-                    <span className="font-bold w-4 text-center text-sm">{children}</span>
-                    <button 
-                      onClick={() => {
-                        if (adults + children < maxSlots) {
-                          setChildren(children + 1);
-                        }
-                      }} 
-                      disabled={isMaxReached}
-                      className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold hover:bg-slate-900 hover:text-white transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={handleBooking}
-                className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-sky-600 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100 mb-4 text-sm tracking-wide"
-                disabled={!selectedScheduleId}
-              >
-                {selectedScheduleId ? "Đặt hành trình ngay" : "Chọn ngày khởi hành"}
-              </button>
 
               <button
                 onClick={() => {
@@ -493,27 +917,27 @@ export default function TourDetailPage() {
                     }
                   }));
                 }}
-                className="w-full py-3.5 bg-sky-50 hover:bg-sky-100 text-sky-600 font-bold rounded-2xl active:scale-[0.98] transition-all mb-4 text-sm tracking-wide flex items-center justify-center gap-2 border border-sky-100 shadow-sm cursor-pointer"
+                className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-600 font-bold rounded-xl active:scale-[0.98] transition-all mb-3 text-xs tracking-wide flex items-center justify-center gap-1.5 border border-sky-100 shadow-sm cursor-pointer"
               >
                 💬 Nhận tư vấn về tour này
               </button>
               
-              <button className="w-full py-3 text-slate-400 font-bold text-xs hover:text-rose-500 transition-colors uppercase tracking-widest">
+              <button className="w-full py-2 text-slate-400 font-bold text-[10px] hover:text-rose-500 transition-colors uppercase tracking-widest">
                 ♥ Lưu vào mục yêu thích
               </button>
 
-              <div className="mt-8 pt-6 border-t border-slate-50 flex justify-between gap-4">
+              <div className="mt-6 pt-4 border-t border-slate-50 flex justify-between gap-3">
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg">🛡️</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Bảo mật thanh toán</span>
+                  <span className="text-base">🛡️</span>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Bảo mật thanh toán</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg">↩️</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Hủy tour linh hoạt</span>
+                  <span className="text-base">↩️</span>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Hủy tour linh hoạt</span>
                 </div>
                 <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg">⚡</span>
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Xác nhận ngay</span>
+                  <span className="text-base">⚡</span>
+                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter text-center leading-none">Xác nhận ngay</span>
                 </div>
               </div>
             </div>
@@ -527,6 +951,9 @@ export default function TourDetailPage() {
           <p className="text-slate-300 text-[11px] font-medium tracking-wide">© 2026 Toàn bộ bản quyền thuộc về hành trình của bạn.</p>
         </div>
       </footer>
+
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 }
