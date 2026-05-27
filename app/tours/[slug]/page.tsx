@@ -335,9 +335,19 @@ export default function TourDetailPage() {
     }
   };
 
-  const hasBookedThisTour = userBookings.some(
-    (booking) => booking.tourId === tourId && booking.status !== "cancelled"
-  );
+  const tourBookings = useMemo(() => {
+    return userBookings.filter(
+      (booking) => booking.tourId === tourId && booking.status?.toUpperCase() !== "CANCELLED"
+    );
+  }, [userBookings, tourId]);
+
+  const [unreviewedBookings, setUnreviewedBookings] = useState<any[]>([]);
+
+  useEffect(() => {
+    setUnreviewedBookings(tourBookings.filter((b) => !b.reviewed));
+  }, [tourBookings]);
+
+  const hasBookedThisTour = tourBookings.length > 0;
 
   if (loadingTour) return <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>;
   if (error || !tour) return <div className="p-20 text-center text-red-500 font-bold">{error || "Tour không tồn tại"}</div>;
@@ -588,11 +598,22 @@ export default function TourDetailPage() {
                   Đang kiểm tra booking...
                 </div>
               ) : hasBookedThisTour ? (
-                <ReviewForm
-                  tourId={tour.id}
-                  customerId={currentUser.id || ""}
-                  onSuccess={() => setReviewRefresh((prev) => prev + 1)}
-                />
+                unreviewedBookings.length > 0 ? (
+                  <ReviewForm
+                    tourId={tour.id}
+                    customerId={currentUser.id || ""}
+                    unreviewedBookings={unreviewedBookings}
+                    onSuccess={(bookingId) => {
+                      setUnreviewedBookings((prev) => prev.filter((b) => b.bookingId !== bookingId));
+                      setReviewRefresh((prev) => prev + 1);
+                    }}
+                  />
+                ) : (
+                  <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                    <p className="text-emerald-900 font-bold mb-1.5">✓ Đã hoàn tất đánh giá</p>
+                    <p className="text-emerald-700 text-xs font-medium">Bạn đã hoàn thành đánh giá cho tất cả {tourBookings.length} chuyến đi của tour này. Cảm ơn bạn!</p>
+                  </div>
+                )
               ) : (
                 <div className="p-6 bg-amber-50 border border-amber-200 rounded-xl text-center">
                   <p className="text-amber-900 font-medium mb-2">📋 Bạn phải đặt tour này trước khi có thể đánh giá</p>
