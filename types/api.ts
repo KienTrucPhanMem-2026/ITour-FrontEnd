@@ -151,6 +151,11 @@ export interface BookingResponseDTO {
   tourGuideName?: string;
   note?: string;
   departureDate?: string;
+  startDate?: string;
+  endDate?: string;
+  tourImage?: string;
+  tourGuidePhone?: string;
+  licensePlate?: string;
 }
 
 // ---------- MoMo Payment ----------
@@ -165,4 +170,16 @@ export interface MomoCreatePaymentResponse {
   payUrl: string;
   deeplink?: string;
   qrCodeUrl?: string;
+}
+
+// ---------- Notification ----------
+export interface NotificationDTO {
+  id: string;
+  customerId: string;
+  title: string;
+  message: string;
+  type: string;        // VD: BOOKING_SUCCESS, SYSTEM_ALERT
+  actionUrl?: string;
+  read: boolean;
+  createdAt: string;   // ISO datetime string
 }

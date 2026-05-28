@@ -8,24 +8,7 @@ export default function Footer() {
           {/* Brand - Chiếm 4 cột để tạo độ thoáng */}
           <div className="md:col-span-4">
             <div className="flex items-center gap-3 mb-6 group cursor-pointer">
-              <div className="w-11 h-11 rounded-2xl bg-sky-600 flex items-center justify-center shadow-lg shadow-sky-500/20 transition-transform group-hover:rotate-6">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <span className="text-xl font-bold text-white tracking-tight">
-                Du Lịch Việt
-              </span>
+              <img src="/assets/3-1.png" alt="logo" width={100} height={100} />
             </div>
             <p className="text-sm leading-relaxed text-slate-400 pr-10">
               Kiến tạo những hành trình di sản, đưa bạn đến những vùng đất mới
@@ -129,7 +112,7 @@ export default function Footer() {
                 </li>
                 <li className="flex items-center gap-3">
                   <span className="text-sky-500 font-bold">E.</span>{" "}
-                  hello@dulichviet.com
+                  hello@itour.com
                 </li>
                 <li className="text-slate-500 leading-relaxed italic">
                   Quận 1, TP. Hồ Chí Minh, Việt Nam
@@ -142,7 +125,7 @@ export default function Footer() {
         {/* Bottom Bar - Cực kỳ tối giản */}
         <div className="pt-8 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-6 text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">
-            <p>© 2026 DU LICH VIET CO.</p>
+            <p>© 2026 ITour CO.</p>
             <div className="hidden md:block h-1 w-1 rounded-full bg-slate-700" />
             <a href="#" className="hover:text-white transition">
               Privacy
