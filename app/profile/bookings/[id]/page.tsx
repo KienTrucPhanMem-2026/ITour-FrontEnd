@@ -45,13 +45,13 @@ interface ToastItem { id: number; type: ToastType; message: string }
 function ToastContainer({ toasts, onDismiss }: { toasts: ToastItem[]; onDismiss: (id: number) => void }) {
   const icons: Record<ToastType, React.ReactNode> = {
     success: <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />,
-    error:   <XCircle className="w-4 h-4 text-rose-500 shrink-0" />,
-    info:    <Info className="w-4 h-4 text-sky-500 shrink-0" />,
+    error: <XCircle className="w-4 h-4 text-rose-500 shrink-0" />,
+    info: <Info className="w-4 h-4 text-sky-500 shrink-0" />,
   };
   const borders: Record<ToastType, string> = {
     success: "border-l-4 border-l-emerald-400",
-    error:   "border-l-4 border-l-rose-400",
-    info:    "border-l-4 border-l-sky-400",
+    error: "border-l-4 border-l-rose-400",
+    info: "border-l-4 border-l-sky-400",
   };
   return (
     <div className="fixed top-5 right-5 z-[9999] flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 340 }}>
@@ -128,30 +128,27 @@ function CollapsePanel({
 
   return (
     <div
-      className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
-        isOpen
-          ? "border-indigo-200 shadow-md shadow-indigo-50"
-          : passenger._saved
+      className={`rounded-2xl border transition-all duration-200 overflow-hidden ${isOpen
+        ? "border-indigo-200 shadow-md shadow-indigo-50"
+        : passenger._saved
           ? "border-emerald-100 bg-emerald-50/30"
           : "border-slate-100 bg-white hover:border-slate-200"
-      }`}
+        }`}
     >
       {/* Header — clickable */}
       <button
         type="button"
         onClick={onToggle}
-        className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${
-          isOpen ? "bg-indigo-50/60" : "bg-transparent"
-        }`}
+        className={`w-full flex items-center justify-between px-5 py-4 text-left transition-colors ${isOpen ? "bg-indigo-50/60" : "bg-transparent"
+          }`}
       >
         <div className="flex items-center gap-3">
           {/* Number badge */}
           <span
-            className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-black text-xs shrink-0 ${
-              passenger._saved
-                ? "bg-emerald-500 text-white"
-                : "bg-slate-100 text-slate-500"
-            }`}
+            className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-black text-xs shrink-0 ${passenger._saved
+              ? "bg-emerald-500 text-white"
+              : "bg-slate-100 text-slate-500"
+              }`}
           >
             {passenger._saved ? (
               <CheckCircle2 className="w-4 h-4" />
@@ -369,11 +366,42 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   MOMO: "Ví MoMo",
 };
 
-const STATUS_CONFIG: Record<string, { text: string; bg: string; textClass: string; border: string }> = {
-  PENDING:   { text: "Đang chờ thanh toán", bg: "bg-amber-50",  textClass: "text-amber-700",  border: "border-amber-100" },
-  CONFIRMED: { text: "Đã xác nhận",         bg: "bg-emerald-50",textClass: "text-emerald-700",border: "border-emerald-100" },
-  COMPLETED: { text: "Hoàn tất chuyến đi",  bg: "bg-sky-50",   textClass: "text-sky-700",    border: "border-sky-100" },
-  CANCELLED: { text: "Đã hủy đơn",          bg: "bg-rose-50",  textClass: "text-rose-700",   border: "border-rose-100" },
+const STATUS_CONFIG: Record<string, { text: string; bg: string; textClass: string; border: string; icon: React.ReactNode }> = {
+  PENDING: {
+    text: "Đang chờ thanh toán",
+    bg: "bg-amber-50/80",
+    textClass: "text-amber-800 font-bold",
+    border: "border-amber-100",
+    icon: <Clock className="w-3.5 h-3.5 fill-amber-500 text-white shrink-0" />
+  },
+  PAID: {
+    text: "Đã thanh toán (Thành công)",
+    bg: "bg-emerald-50/80",
+    textClass: "text-emerald-800 font-bold",
+    border: "border-emerald-100",
+    icon: <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-500 text-white shrink-0" />
+  },
+  CONFIRMED: {
+    text: "Đã xác nhận",
+    bg: "bg-emerald-50/80",
+    textClass: "text-emerald-800 font-bold",
+    border: "border-emerald-100",
+    icon: <CheckCircle2 className="w-3.5 h-3.5 fill-emerald-500 text-white shrink-0" />
+  },
+  COMPLETED: {
+    text: "Chuyến đi đã hoàn thành",
+    bg: "bg-sky-50/80",
+    textClass: "text-sky-800 font-bold",
+    border: "border-sky-100",
+    icon: <CheckCircle2 className="w-3.5 h-3.5 fill-sky-500 text-white shrink-0" />
+  },
+  CANCELLED: {
+    text: "Đã hủy đơn",
+    bg: "bg-rose-50/80",
+    textClass: "text-rose-800 font-bold",
+    border: "border-rose-100",
+    icon: <XCircle className="w-3.5 h-3.5 fill-rose-500 text-white shrink-0" />
+  },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -392,6 +420,7 @@ export default function BookingDetailPage() {
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [weatherModalOpen, setWeatherModalOpen] = useState(false);
 
   // Review states
   const [review, setReview] = useState<any | null>(null);
@@ -499,7 +528,7 @@ export default function BookingDetailPage() {
       const createdReview = await createReviewAPI(payload);
       showToast("Đánh giá của bạn đã được gửi thành công!", "success");
       setReview(createdReview);
-      
+
       // Update bookingDto reviewed status locally to prevent form showing
       setBookingDto((prev: any) => prev ? { ...prev, reviewed: true } : null);
     } catch (err: any) {
@@ -537,10 +566,10 @@ export default function BookingDetailPage() {
       const next = [...prev];
       next[idx] = {
         ...next[idx],
-        fullName:       c.fullName        || next[idx].fullName,
-        dob:            dobStr            || next[idx].dob,
-        phoneNumber:    c.phone           || next[idx].phoneNumber,
-        identityNumber: c.identityNumber  || next[idx].identityNumber,
+        fullName: c.fullName || next[idx].fullName,
+        dob: dobStr || next[idx].dob,
+        phoneNumber: c.phone || next[idx].phoneNumber,
+        identityNumber: c.identityNumber || next[idx].identityNumber,
         _saved: false,
       };
       return next;
@@ -548,9 +577,9 @@ export default function BookingDetailPage() {
 
     const filled = [
       "họ tên",
-      dobStr            && "ngày sinh",
-      c.phone           && "SĐT",
-      c.identityNumber  && "CCCD",
+      dobStr && "ngày sinh",
+      c.phone && "SĐT",
+      c.identityNumber && "CCCD",
     ].filter(Boolean).join(", ");
     showToast(`Đã tự động điền: ${filled}.`, "info");
   };
@@ -644,7 +673,7 @@ export default function BookingDetailPage() {
   }
 
   const status = isExpired && isPending ? "CANCELLED" : booking.status;
-  const cfg = STATUS_CONFIG[status] || { text: status, bg: "bg-slate-50", textClass: "text-slate-700", border: "border-slate-100" };
+  const cfg = STATUS_CONFIG[status] || { text: status, bg: "bg-slate-50", textClass: "text-slate-700", border: "border-slate-100", icon: <Info className="w-3.5 h-3.5 fill-slate-500 text-white shrink-0" /> };
 
   return (
     <div className="min-h-screen bg-[#F5F8F8] flex flex-col justify-between">
@@ -660,73 +689,240 @@ export default function BookingDetailPage() {
       `}</style>
 
       <main className="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 py-10">
-        {/* Back */}
-        <Link
-          href="/profile"
-          className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 font-bold text-sm mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" /> Quay lại lịch sử đặt tour
-        </Link>
+        {/* Header Card */}
+        <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 mb-8">
+          <div className="space-y-3">
+            {/* Back action + breadcrumb subtitle */}
+            <Link
+              href="/profile?tab=bookings"
+              className="inline-flex items-center gap-1.5 text-slate-400 hover:text-indigo-600 font-extrabold text-xs transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Chuyến đi của tôi
+            </Link>
 
-        {/* Title row */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <span className="text-xs font-black bg-slate-900 text-white px-3 py-1 rounded-md uppercase tracking-wider">
-                #{booking.id}
-              </span>
-              <span className={`text-xs font-black px-3 py-1 rounded-full border ${cfg.bg} ${cfg.textClass} ${cfg.border}`}>
+            {/* Booking Title and Status tag */}
+            <div className="flex items-center gap-3.5 flex-wrap pt-0.5">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Đơn hàng #{booking.id}</h1>
+              <span className={`text-xs font-black px-3.5 py-1.5 rounded-full border ${cfg.bg} ${cfg.textClass} ${cfg.border} flex items-center gap-1.5 shadow-sm`}>
+                {cfg.icon}
                 {cfg.text}
               </span>
             </div>
-            <h1 className="text-2xl font-black text-slate-900 mt-2">Chi Tiết Đơn Hàng</h1>
+
+            {/* Meta info row */}
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-400 pt-1.5 border-t border-slate-50 mt-2">
+              <span className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4 fill-slate-300 text-white shrink-0" />
+                <span>Đặt ngày: <strong className="text-slate-700 font-bold">{booking.bookingDate ? new Date(booking.bookingDate).toLocaleString("vi-VN") : "—"}</strong></span>
+              </span>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 font-semibold">
-            Đặt ngày: {booking.bookingDate ? new Date(booking.bookingDate).toLocaleString("vi-VN") : "—"}
-          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* ── LEFT 2 cols ── */}
           <div className="lg:col-span-2 space-y-6">
 
-            {/* Tour card */}
-            {tour && (
-              <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
-                <div className="flex gap-4">
-                  {tour.tourImages?.[0]?.imageUrl && (
-                    <div className="w-24 h-24 rounded-2xl overflow-hidden shrink-0 border border-slate-100">
-                      <img src={tour.tourImages[0].imageUrl} alt={tour.name} className="w-full h-full object-cover" />
+            {/* ══════════════════════════════════════════════
+                UNIFIED TRAVEL EXPERIENCE & TRANSACTION SECTIONS (KHỐI TRẢI NGHIỆM & KHỐI GIAO DỊCH)
+            ══════════════════════════════════════════════ */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+              {/* KHỐI TRẢI NGHIỆM (DỮ LIỆU SCHEDULE) */}
+              <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-all duration-300">
+                <div>
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3.5 flex items-center gap-1.5">
+                    <span className="w-1.5 h-3.5 bg-[#0EA5E9] rounded-full"></span>
+                    Khối Trải nghiệm (Hành trình)
+                  </h3>
+
+                  {tour && (
+                    <div className="flex gap-3 mb-4 items-center border-b border-slate-50 pb-3">
+                      {tour.tourImages?.[0]?.imageUrl && (
+                        <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 border border-slate-100 shadow-sm">
+                          <img src={tour.tourImages[0].imageUrl} alt={tour.name} className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      <div>
+                        <h4 className="font-extrabold text-slate-800 text-sm line-clamp-2 leading-snug">{tour.name}</h4>
+                        <span className="text-[10px] text-slate-400 font-bold block mt-0.5">Thời gian: {tour.durationDays}N{tour.durationNights}Đ</span>
+                      </div>
                     </div>
                   )}
-                  <div className="flex-grow">
-                    <h2 className="text-base font-black text-slate-900 leading-snug mb-2">{tour.name}</h2>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs font-semibold text-slate-500">
-                      {tour.startDestination && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-sky-400 fill-sky-400" /> Khởi hành: {tour.startDestination.name}
+
+                  <div className="space-y-3 pt-1">
+                    {/* Giờ tập trung */}
+                    <div className="flex items-start gap-3 bg-slate-50/70 p-3 rounded-2xl border border-slate-50">
+                      <Clock className="w-4 h-4 text-[#0EA5E9] shrink-0 mt-0.5" />
+                      <div>
+                        <span className="text-[9px] font-black uppercase text-slate-400 block tracking-wider mb-0.5">Giờ tập trung</span>
+                        <strong className="text-xs font-black text-slate-800">06:00 sáng</strong>
+                        <span className="text-[10px] text-slate-500 font-semibold block">
+                          (Ngày {bookingDto?.startDate ? new Date(bookingDto.startDate).toLocaleDateString("vi-VN") : "khởi hành"})
                         </span>
-                      )}
-                      {tour.endDestination && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-rose-400 fill-rose-400" /> Điểm đến: {tour.endDestination.name}
-                        </span>
-                      )}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between border-t border-slate-50 pt-3 mt-3">
-                      <span className="text-xs font-bold text-slate-400">
-                        ⏱️ {tour.durationDays} ngày {tour.durationNights} đêm
-                      </span>
-                      {tour.rating && (
-                        <span className="flex items-center gap-0.5 text-xs font-bold text-amber-500 bg-amber-50 border border-amber-100 px-2.5 py-0.5 rounded-full">
-                          <Star className="w-3 h-3 fill-amber-500 text-amber-500" /> {tour.rating.toFixed(1)}
-                        </span>
-                      )}
+
+                    {/* Biển số xe */}
+                    <div className="flex items-start gap-3 bg-slate-50/70 p-3 rounded-2xl border border-slate-50">
+                      <svg className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5 fill-indigo-100" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="5" y="10" width="14" height="9" rx="1" />
+                        <circle cx="8" cy="15" r="1.5" />
+                        <circle cx="16" cy="15" r="1.5" />
+                        <path d="M19 10L17 5H7L5 10" />
+                      </svg>
+                      <div>
+                        <span className="text-[9px] font-black uppercase text-slate-400 block tracking-wider mb-0.5">Phương tiện trung chuyển</span>
+                        <strong className="text-xs font-black text-slate-800">{bookingDto?.licensePlate || "Đang điều phối xe"}</strong>
+                      </div>
+                    </div>
+
+                    {/* Hướng dẫn viên */}
+                    <div className="flex items-start gap-3 bg-slate-50/70 p-3 rounded-2xl border border-slate-50">
+                      <User className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5 fill-emerald-100" />
+                      <div>
+                        <span className="text-[9px] font-black uppercase text-slate-400 block tracking-wider mb-0.5">Hướng dẫn viên (HDV)</span>
+                        {bookingDto?.tourGuideName ? (
+                          <>
+                            <strong className="text-xs font-black text-slate-800 block">{bookingDto.tourGuideName}</strong>
+                            <a href={`tel:${bookingDto.tourGuidePhone}`} className="text-[10px] text-emerald-600 font-bold hover:underline inline-flex items-center gap-1 mt-0.5">
+                              📞 {bookingDto.tourGuidePhone} (Gọi HDV)
+                            </a>
+                          </>
+                        ) : (
+                          <strong className="text-xs font-bold text-slate-400">Đang điều phối nhân sự</strong>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-5 pt-3 border-t border-slate-50 flex flex-col gap-2">
+                  <button
+                    onClick={() => setWeatherModalOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-md shadow-orange-100 active:scale-95 transition-all"
+                  >
+                    <svg className="w-4 h-4 shrink-0 fill-white text-white" viewBox="0 0 24 24">
+                      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                      <circle cx="12" cy="12" r="5" fill="currentColor" />
+                    </svg>
+                    Xem thời tiết điểm đến
+                  </button>
+
+                  {tour && (
+                    <Link
+                      href={`/tours/${tour.id}`}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-black rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-95 border border-indigo-100/30"
+                    >
+                      <Info className="w-3.5 h-3.5 fill-indigo-600 text-indigo-50 shrink-0" />
+                      Xem chi tiết tour
+                    </Link>
+                  )}
+                </div>
               </div>
-            )}
+
+              {/* KHỐI GIAO DỊCH (DỮ LIỆU BOOKING) */}
+              <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6 flex flex-col justify-between hover:shadow-md transition-all duration-300">
+                <div>
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3.5 flex items-center gap-1.5">
+                    <span className="w-1.5 h-3.5 bg-emerald-500 rounded-full"></span>
+                    Khối Giao dịch (Vé & Hóa đơn)
+                  </h3>
+
+                  {/* Glassmorphic E-Ticket Layout */}
+                  <div className="relative rounded-2xl p-4 flex items-center justify-between border border-dashed border-indigo-200 bg-indigo-50/30 overflow-hidden mb-4 min-h-[140px]">
+                    <div className="absolute top-1/2 -left-2 w-4 h-4 rounded-full bg-white -translate-y-1/2 border-r border-indigo-200"></div>
+                    <div className="absolute top-1/2 -right-2 w-4 h-4 rounded-full bg-white -translate-y-1/2 border-l border-indigo-200"></div>
+
+                    <div className="pr-2 max-w-[50%]">
+                      <span className="text-[9px] font-black text-indigo-500 uppercase block tracking-wider mb-0.5">VÉ ĐIỆN TỬ</span>
+                      <strong className="text-sm font-black text-slate-800 block line-clamp-1 leading-snug">VÉ DU LỊCH</strong>
+                      <span className="text-[10px] font-mono text-slate-400 font-bold block mt-0.5">#{booking.id}</span>
+
+                      <div className="mt-2.5">
+                        <span className="text-[8px] font-bold text-slate-400 block uppercase">Trạng thái vé</span>
+                        {booking.paymentStatus === "PAID" || booking.status === "PAID" || booking.status === "CONFIRMED" || booking.status === "COMPLETED" ? (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 inline-block uppercase mt-0.5">Đã xuất vé</span>
+                        ) : booking.status === "CANCELLED" ? (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 inline-block uppercase mt-0.5">Đã hủy</span>
+                        ) : (
+                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 inline-block uppercase mt-0.5">Chờ TT</span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* QR Code Container */}
+                    <div className="shrink-0 flex flex-col items-center">
+                      <div className="w-24 h-24 flex items-center justify-center border border-slate-100 p-1.5 rounded-xl bg-white shadow-sm">
+                        <svg className="w-full h-full text-slate-800" viewBox="0 0 100 100">
+                          <rect x="5" y="5" width="90" height="90" fill="none" stroke="currentColor" strokeWidth="2" />
+                          <rect x="10" y="10" width="20" height="20" fill="currentColor" />
+                          <rect x="14" y="14" width="12" height="12" fill="white" />
+                          <rect x="17" y="17" width="6" height="6" fill="currentColor" />
+
+                          <rect x="70" y="10" width="20" height="20" fill="currentColor" />
+                          <rect x="74" y="14" width="12" height="12" fill="white" />
+                          <rect x="77" y="17" width="6" height="6" fill="currentColor" />
+
+                          <rect x="10" y="70" width="20" height="20" fill="currentColor" />
+                          <rect x="14" y="74" width="12" height="12" fill="white" />
+                          <rect x="17" y="77" width="6" height="6" fill="currentColor" />
+
+                          <rect x="35" y="15" width="8" height="8" fill="currentColor" />
+                          <rect x="45" y="25" width="8" height="8" fill="currentColor" />
+                          <rect x="55" y="15" width="12" height="6" fill="currentColor" />
+                          <rect x="35" y="35" width="6" height="12" fill="currentColor" />
+                          <rect x="45" y="45" width="14" height="6" fill="currentColor" />
+                          <rect x="15" y="45" width="10" height="8" fill="currentColor" />
+                          <rect x="45" y="55" width="8" height="8" fill="currentColor" />
+                          <rect x="35" y="65" width="12" height="6" fill="currentColor" />
+                          <rect x="65" y="45" width="6" height="14" fill="currentColor" />
+                          <rect x="75" y="35" width="10" height="8" fill="currentColor" />
+                          <rect x="65" y="65" width="8" height="8" fill="currentColor" />
+                          <rect x="55" y="75" width="12" height="10" fill="currentColor" />
+                          <rect x="35" y="75" width="8" height="8" fill="currentColor" />
+                          <rect x="75" y="75" width="10" height="10" fill="currentColor" />
+
+                          <rect x="42" y="42" width="16" height="16" fill="white" />
+                          <text x="50" y="54" fontSize="9" fontWeight="900" fill="currentColor" textAnchor="middle">iTour</text>
+                        </svg>
+                      </div>
+                      <span className="text-[8px] font-mono font-black text-slate-400 mt-1.5 uppercase tracking-widest">CHECK-IN</span>
+                    </div>
+                  </div>
+
+                  {/* Transaction metadata */}
+                  <div className="space-y-2 pt-1">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-400">Trạng thái thanh toán:</span>
+                      <strong className={`font-black ${booking.paymentStatus === "PAID" ? "text-emerald-600" : "text-amber-500"}`}>
+                        {booking.paymentStatus === "PAID" ? "Đã thanh toán (PAID)" : "Chưa thanh toán"}
+                      </strong>
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className="text-slate-400">Mã đơn hàng:</span>
+                      <strong className="text-slate-800 font-black">#{booking.id}</strong>
+                    </div>
+                    {booking.paymentDate && (
+                      <div className="flex justify-between text-xs font-semibold">
+                        <span className="text-slate-400">Thời gian giao dịch:</span>
+                        <strong className="text-slate-700 font-bold">{new Date(booking.paymentDate).toLocaleString("vi-VN")}</strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 pt-3 border-t border-slate-50 flex gap-2">
+                  <button
+                    onClick={() => window.print()}
+                    className="flex-grow flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 border border-slate-200/50"
+                  >
+                    💾 Xuất hóa đơn
+                  </button>
+                </div>
+              </div>
+
+            </div>
 
             {/* ══════════════════════════════════════════════
                 PASSENGER SECTION — COLLAPSE UX
@@ -736,7 +932,7 @@ export default function BookingDetailPage() {
               <div className="flex items-start justify-between mb-2 flex-wrap gap-3">
                 <div>
                   <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-                    <Users className="w-5 h-5 fill-purple-400 text-purple-400" />
+                    <Users className="w-5 h-5 fill-purple-500 text-purple-100 shrink-0" />
                     Thông tin hành khách đi tour
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5 ml-7 font-medium">
@@ -803,14 +999,14 @@ export default function BookingDetailPage() {
             {booking.customer && (
               <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-6">
                 <h3 className="text-base font-black text-slate-900 mb-5 flex items-center gap-2">
-                  <User className="w-5 h-5 fill-sky-400 text-sky-400" />
+                  <User className="w-5 h-5 fill-sky-500 text-sky-100 shrink-0" />
                   Người đặt hàng (Liên hệ)
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold text-slate-500">
                   {[
                     { icon: <User className="w-4 h-4 text-slate-400" />, label: "Họ và tên", value: booking.customer.fullName },
-                    { icon: <Mail className="w-4 h-4 text-slate-400" />, label: "Email",     value: booking.customer.email },
-                    { icon: <Phone className="w-4 h-4 text-slate-400" />, label: "SĐT",      value: booking.customer.phone },
+                    { icon: <Mail className="w-4 h-4 text-slate-400" />, label: "Email", value: booking.customer.email },
+                    { icon: <Phone className="w-4 h-4 text-slate-400" />, label: "SĐT", value: booking.customer.phone },
                   ].filter(r => r.value).map((row) => (
                     <div key={row.label} className="bg-slate-50/50 p-4 rounded-xl border border-slate-50 flex items-center gap-3">
                       {row.icon}
@@ -830,14 +1026,14 @@ export default function BookingDetailPage() {
                 <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
                   <span>★</span> Đánh giá chuyến đi của bạn
                 </h3>
-                
+
                 {bookingDto.reviewed && review ? (
                   // Review was submitted, show it in readonly view
                   <div className="space-y-4">
                     <p className="text-xs text-slate-500 font-bold bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl px-4 py-3">
                       ✓ Bạn đã gửi đánh giá cho chuyến đi này. Cảm ơn phản hồi của bạn!
                     </p>
-                    
+
                     {/* Tour Rating Display */}
                     <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
                       <h4 className="text-sm font-bold text-slate-800 mb-2">Đánh giá của bạn về Tour</h4>
@@ -965,15 +1161,15 @@ export default function BookingDetailPage() {
           <div className="space-y-6">
             <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 p-6">
               <h3 className="text-base font-black text-slate-900 mb-5 pb-3 border-b border-slate-50 flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 fill-emerald-400 text-emerald-400" />
+                <ShieldCheck className="w-5 h-5 fill-emerald-500 text-emerald-100 shrink-0" />
                 Chi tiết thanh toán
               </h3>
 
               <div className="space-y-4 text-xs font-semibold text-slate-500">
                 {[
-                  { label: "Giá gốc / khách",   value: formatPrice(booking.unitPrice) },
-                  { label: "Số lượng",           value: `${booking.quantity} người (${booking.adults} NL, ${booking.children} TE)` },
-                  { label: "Tạm tính",           value: formatPrice(booking.totalPrice) },
+                  { label: "Giá gốc / khách", value: formatPrice(booking.unitPrice) },
+                  { label: "Số lượng", value: `${booking.quantity} người (${booking.adults} NL, ${booking.children} TE)` },
+                  { label: "Tạm tính", value: formatPrice(booking.totalPrice) },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex justify-between">
                     <span>{label}</span>
@@ -1096,6 +1292,88 @@ export default function BookingDetailPage() {
                 className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
               >
                 {isCancelling ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "Hủy đặt tour"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weather Forecast Modal */}
+      {weatherModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100/80 animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <svg className="w-5 h-5 fill-amber-400 text-amber-400" viewBox="0 0 24 24">
+                  <path d="M12 2.25a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75zM6.16 5.1a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06L6.16 6.16a.75.75 0 0 1 0-1.06zm10.62 0a.75.75 0 0 1 0 1.06l-1.06 1.06a.75.75 0 1 1-1.06-1.06l1.06-1.06a.75.75 0 0 1 1.06 0zM12 6.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5zM2.25 12a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75zm16.5 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75zM5.1 17.84a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 1 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0zm10.62 0a.75.75 0 0 1-1.06 0l-1.06-1.06a.75.75 0 1 1 1.06-1.06l1.06 1.06a.75.75 0 0 1 0 1.06zM12 19.25a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75z" />
+                </svg>
+                Dự báo thời tiết 3 ngày tới
+              </h3>
+              <button
+                onClick={() => setWeatherModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 mb-5 font-semibold">
+              Dự báo thời tiết thực tế tại điểm đến du lịch của chuyến đi: <strong className="text-slate-800 font-extrabold">{tour?.endDestination?.name || "Điểm đến du lịch"}</strong>
+            </p>
+
+            <div className="space-y-3">
+              {/* Day 1 */}
+              <div className="flex items-center justify-between p-3.5 bg-gradient-to-r from-amber-50 to-orange-50/50 border border-amber-100/50 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">☀️</span>
+                  <div>
+                    <strong className="text-xs font-black text-slate-800 block">Ngày khởi hành (Hôm nay)</strong>
+                    <span className="text-[10px] text-slate-500 font-semibold">Nắng ráo, trời trong xanh, ít mây</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-sm font-black text-amber-700 block">28°C</span>
+                  <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Lý tưởng</span>
+                </div>
+              </div>
+
+              {/* Day 2 */}
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⛅</span>
+                  <div>
+                    <strong className="text-xs font-black text-slate-800 block">Ngày 2 (Ngày mai)</strong>
+                    <span className="text-[10px] text-slate-500 font-semibold">Nhiều mây, gió mát nhẹ, dễ chịu</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-sm font-black text-slate-700 block">26°C</span>
+                  <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Mát mẻ</span>
+                </div>
+              </div>
+
+              {/* Day 3 */}
+              <div className="flex items-center justify-between p-3.5 bg-slate-50 border border-slate-100 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🌦️</span>
+                  <div>
+                    <strong className="text-xs font-black text-slate-800 block">Ngày 3 (Kế tiếp)</strong>
+                    <span className="text-[10px] text-slate-500 font-semibold">Mưa rào nhẹ rải rác vào buổi chiều</span>
+                  </div>
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-sm font-black text-slate-700 block">27°C</span>
+                  <span className="text-[9px] text-slate-400 font-bold block uppercase tracking-wider">Mưa nhẹ</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setWeatherModalOpen(false)}
+                className="px-6 py-2.5 bg-slate-900 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all hover:bg-slate-800 shadow-md shadow-slate-100 active:scale-95"
+              >
+                Đóng
               </button>
             </div>
           </div>

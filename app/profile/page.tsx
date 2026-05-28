@@ -2,28 +2,35 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import TourCard from "@/components/TourCard";
 import ProfileBookingCard from "@/components/ProfileBookingCard";
 import { getStoredUser, setStoredUser, clearStoredUser } from "@/lib/auth";
-import { getUserProfileAPI, updateUserProfileAPI } from "@/lib/api/users";
+import { getUserProfileAPI, updateUserProfileAPI, getUserVouchersAPI } from "@/lib/api/users";
 import { getMyBookingsAPI, cancelBookingAPI } from "@/lib/api/bookings";
 import { getFavouriteToursAPI, removeFavouriteAPI } from "@/lib/api/favourites";
 import type { UserProfile, BookingResponseDTO, TourDTO, UpdateProfileRequest } from "@/types/api";
+import {
+  User as UserIcon, Calendar, Heart, Ticket, Eye, Clock, Phone, Award,
+  ShieldAlert, Sparkles, CheckCircle, Trash2, ShieldCheck, Zap
+} from "lucide-react";
 
-type TabType = "info" | "bookings" | "favourites";
+type TabType = "info" | "bookings" | "schedules" | "vouchers" | "favourites";
 
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>("info");
+  const [scheduleTab, setScheduleTab] = useState<"upcoming" | "in_progress" | "completed" | "cancelled">("upcoming");
   const [isLoading, setIsLoading] = useState(true);
 
   // Data states
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [bookings, setBookings] = useState<BookingResponseDTO[]>([]);
   const [favTours, setFavTours] = useState<TourDTO[]>([]);
+  const [vouchers, setVouchers] = useState<any[]>([]);
 
   // Edit Profile states
   const [isUpdating, setIsUpdating] = useState(false);
@@ -42,7 +49,14 @@ export default function ProfilePage() {
   // React to search param changes
   useEffect(() => {
     const tabParam = searchParams.get("tab");
-    if (tabParam === "info" || tabParam === "bookings" || tabParam === "favourites") {
+    if (tabParam === "schedules") {
+      setActiveTab("bookings");
+    } else if (
+      tabParam === "info" ||
+      tabParam === "bookings" ||
+      tabParam === "vouchers" ||
+      tabParam === "favourites"
+    ) {
       setActiveTab(tabParam as TabType);
     }
   }, [searchParams]);
@@ -50,7 +64,7 @@ export default function ProfilePage() {
   const loadAllData = async (userId: string) => {
     setIsLoading(true);
     try {
-      const [pData, bData, fData] = await Promise.all([
+      const [pData, bData, fData, vData] = await Promise.all([
         getUserProfileAPI(userId).catch((err) => {
           console.error("Erro ao carregar perfil:", err);
           return null;
@@ -61,6 +75,10 @@ export default function ProfilePage() {
         }),
         getFavouriteToursAPI(userId).catch((err) => {
           console.error("Erro ao carregar favoritos:", err);
+          return [];
+        }),
+        getUserVouchersAPI(userId).catch((err) => {
+          console.error("Error loading vouchers:", err);
           return [];
         })
       ]);
@@ -91,6 +109,7 @@ export default function ProfilePage() {
       });
       setBookings(sortedBookings);
       setFavTours(fData || []);
+      setVouchers(vData || []);
     } catch (err) {
       console.error("Erro ao carregar dados:", err);
       alert("Không thể tải dữ liệu hồ sơ. Vui lòng thử lại.");
@@ -218,24 +237,30 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Left Sidebar Navigation */}
           <aside className="lg:col-span-1">
-            <nav className="bg-white rounded-2xl shadow-sm border border-gray-100 p-2 flex flex-col gap-1 sticky top-24">
+            <nav className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 flex flex-col gap-1 sticky top-24">
               <button 
                 onClick={() => setActiveTab("info")}
-                className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition ${activeTab === 'info' ? 'bg-sky-50 text-sky-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'info' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
-                👤 Thông tin tài khoản
+                <UserIcon className="w-4 h-4 shrink-0" /> Thông tin tài khoản
               </button>
               <button 
                 onClick={() => setActiveTab("bookings")}
-                className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition ${activeTab === 'bookings' ? 'bg-sky-50 text-sky-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'bookings' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
-                📄 Lịch sử đặt tour
+                <Calendar className="w-4 h-4 shrink-0" /> Chuyến đi của tôi
+              </button>
+              <button 
+                onClick={() => setActiveTab("vouchers")}
+                className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'vouchers' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
+              >
+                <Ticket className="w-4 h-4 shrink-0" /> Ví voucher của tôi
               </button>
               <button 
                 onClick={() => setActiveTab("favourites")}
-                className={`flex items-center gap-3 px-4 py-3 text-sm font-semibold rounded-xl transition ${activeTab === 'favourites' ? 'bg-sky-50 text-sky-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'favourites' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
-                ❤️ Tour đã yêu thích
+                <Heart className="w-4 h-4 shrink-0" /> Tour đã yêu thích
               </button>
             </nav>
           </aside>
@@ -341,67 +366,363 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* -- TAB: BOOKINGS -- */}
-            {activeTab === "bookings" && (
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <span className="w-1 h-6 bg-emerald-500 rounded-full"></span>
-                  Lịch sử đặt tour ({bookings.length})
-                </h2>
+            {/* -- TAB: MY TRIPS (CHUYẾN ĐI CỦA TÔI) -- */}
+            {activeTab === "bookings" && (() => {
+              const today = new Date();
+              today.setHours(0, 0, 0, 0);
 
-                {bookings.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                    Bạn chưa thực hiện đơn đặt tour nào.
-                  </div>
-                ) : (
-                  <div className="space-y-5">
-                    {currentBookings.map(b => (
-                      <ProfileBookingCard 
-                        key={b.bookingId} 
-                        booking={b} 
-                        onCancel={handleCancelBooking} 
-                      />
+              const upcomingTrips = bookings.filter(b => 
+                (b.status === "CONFIRMED" || b.status === "PAID" || b.status === "PENDING") && 
+                new Date(b.startDate || b.bookingDate) > today
+              );
+
+              const inProgressTrips = bookings.filter(b => 
+                (b.status === "CONFIRMED" || b.status === "PAID") && 
+                new Date(b.startDate || b.bookingDate) <= today && 
+                new Date(b.endDate || b.bookingDate) >= today
+              );
+
+              const completedTrips = bookings.filter(b => 
+                b.status === "COMPLETED" || 
+                ((b.status === "CONFIRMED" || b.status === "PAID") && new Date(b.endDate || b.bookingDate) < today)
+              );
+
+              const cancelledTrips = bookings.filter(b => 
+                b.status === "CANCELLED"
+              );
+
+              const counts = {
+                upcoming: upcomingTrips.length,
+                in_progress: inProgressTrips.length,
+                completed: completedTrips.length,
+                cancelled: cancelledTrips.length,
+              };
+
+              const currentTripList = 
+                scheduleTab === "upcoming" ? upcomingTrips :
+                scheduleTab === "in_progress" ? inProgressTrips :
+                scheduleTab === "completed" ? completedTrips : cancelledTrips;
+
+              const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
+                const [timeText, setTimeText] = useState("");
+                useEffect(() => {
+                  const updateTime = () => {
+                    const diff = new Date(targetDate).getTime() - Date.now();
+                    if (diff <= 0) { setTimeText("Đến giờ khởi hành!"); return; }
+                    const d = Math.floor(diff / 86400000);
+                    const h = Math.floor((diff % 86400000) / 3600000);
+                    const m = Math.floor((diff % 3600000) / 60000);
+                    setTimeText(`Khởi hành sau: ${d} ngày ${h} giờ ${m} phút`);
+                  };
+                  updateTime();
+                  const timer = setInterval(updateTime, 60000);
+                  return () => clearInterval(timer);
+                }, [targetDate]);
+
+                return (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 font-extrabold text-[10px] uppercase rounded-full border border-amber-100 shadow-sm shrink-0">
+                    <Clock className="w-3.5 h-3.5 fill-amber-500 text-white shrink-0" />
+                    {timeText}
+                  </span>
+                );
+              };
+
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                  <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-sky-500 rounded-full"></span>
+                    Chuyến đi của tôi ({bookings.length})
+                  </h2>
+
+                  {/* Sub Tabs Bar */}
+                  <div className="flex border-b border-slate-100 gap-6 mb-6 overflow-x-auto scrollbar-none">
+                    {[
+                      { id: "upcoming", label: "Sắp khởi hành", count: counts.upcoming, color: "text-[#0EA5E9]" },
+                      { id: "in_progress", label: "Đang diễn ra", count: counts.in_progress, color: "text-emerald-600" },
+                      { id: "completed", label: "Đã hoàn thành", count: counts.completed, color: "text-purple-600" },
+                      { id: "cancelled", label: "Đã hủy", count: counts.cancelled, color: "text-rose-600" }
+                    ].map(sub => (
+                      <button
+                        key={sub.id}
+                        onClick={() => setScheduleTab(sub.id as any)}
+                        className={`pb-3 text-xs font-black uppercase tracking-wider relative transition-all whitespace-nowrap ${scheduleTab === sub.id ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+                      >
+                        {sub.label} ({sub.count})
+                        {scheduleTab === sub.id && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#0EA5E9] rounded-full"></span>
+                        )}
+                      </button>
                     ))}
-
-                    {/* Pagination Controls */}
-                    {totalPages > 1 && (
-                      <div className="flex items-center justify-center gap-2 mt-8 pt-6 border-t border-slate-100">
-                        <button
-                          disabled={currentPage === 1}
-                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                          className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        >
-                          Trước
-                        </button>
-                        {Array.from({ length: totalPages }).map((_, index) => {
-                          const pageNum = index + 1;
-                          return (
-                            <button
-                              key={pageNum}
-                              onClick={() => setCurrentPage(pageNum)}
-                              className={`w-9 h-9 rounded-xl text-xs font-bold transition-all border ${
-                                currentPage === pageNum
-                                  ? "bg-[#0EA5E9] text-white border-[#0EA5E9] shadow-md shadow-sky-100"
-                                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          );
-                        })}
-                        <button
-                          disabled={currentPage === totalPages}
-                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                          className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                        >
-                          Sau
-                        </button>
-                      </div>
-                    )}
                   </div>
-                )}
-              </div>
-            )}
+
+                  {currentTripList.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-100 text-xs font-bold uppercase tracking-wider">
+                      Không có chuyến đi nào ở mục này.
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {currentTripList.map(b => {
+                        const hasImage = !!b.tourImage;
+                        return (
+                          <div key={b.bookingId} className="border border-slate-100 rounded-[1.8rem] p-6 shadow-sm hover:shadow-xl hover:border-slate-200 transition-all duration-300 flex flex-col md:flex-row bg-white gap-5 relative">
+                            {/* Trip Image Left side */}
+                            <div className="w-full md:w-44 h-32 rounded-2xl overflow-hidden shrink-0 border border-slate-100 bg-slate-50 flex items-center justify-center relative">
+                              {hasImage ? (
+                                <img src={b.tourImage} alt={b.tourName} className="w-full h-full object-cover" />
+                              ) : (
+                                <span className="text-slate-300 font-extrabold text-xs uppercase">ITOUR TRIP</span>
+                              )}
+                              <span className="absolute top-2 left-2 z-10 text-[9px] font-black bg-slate-950/80 text-white px-2 py-0.5 rounded-md uppercase tracking-wider backdrop-blur-sm">
+                                #{b.bookingId}
+                              </span>
+                            </div>
+
+                            {/* Trip content right side */}
+                            <div className="flex-grow flex flex-col justify-between">
+                              <div>
+                                <div className="flex flex-wrap items-center gap-3 mb-2">
+                                  {scheduleTab === "upcoming" && b.startDate && (
+                                    <CountdownTimer targetDate={b.startDate} />
+                                  )}
+                                  {scheduleTab === "in_progress" && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 font-extrabold text-[10px] uppercase rounded-full border border-emerald-100 animate-pulse">
+                                      <Sparkles className="w-3.5 h-3.5 fill-emerald-500 text-white shrink-0" />
+                                      Đang diễn ra
+                                    </span>
+                                  )}
+                                  {scheduleTab === "completed" && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-sky-50 text-sky-700 font-extrabold text-[10px] uppercase rounded-full border border-sky-100">
+                                      <CheckCircle className="w-3.5 h-3.5 fill-sky-500 text-white shrink-0" />
+                                      Đã hoàn thành
+                                    </span>
+                                  )}
+                                  {scheduleTab === "cancelled" && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 text-rose-700 font-extrabold text-[10px] uppercase rounded-full border border-rose-100">
+                                      <ShieldAlert className="w-3.5 h-3.5 fill-rose-500 text-white shrink-0" />
+                                      Đã hủy
+                                    </span>
+                                  )}
+                                </div>
+
+                                <Link href={`/profile/bookings/${b.bookingId}`}>
+                                  <h3 className="font-extrabold text-slate-900 text-base md:text-lg hover:text-[#0EA5E9] transition-colors cursor-pointer leading-snug">
+                                    {b.tourName || "Tên Tour"}
+                                  </h3>
+                                </Link>
+
+                                <div className="text-slate-500 text-xs mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 font-semibold">
+                                  {b.startDate && (
+                                    <span className="flex items-center gap-2">
+                                      <Calendar className="w-4 h-4 text-sky-500 fill-sky-100 shrink-0" />
+                                      <span>Khởi hành: <strong className="text-slate-800 font-bold">{new Date(b.startDate).toLocaleDateString("vi-VN")}</strong></span>
+                                    </span>
+                                  )}
+                                  {b.licensePlate && (
+                                    <span className="flex items-center gap-2">
+                                      <Award className="w-4 h-4 text-indigo-500 fill-indigo-100 shrink-0" />
+                                      <span>Biển số xe: <strong className="text-slate-800 font-bold">{b.licensePlate}</strong></span>
+                                    </span>
+                                  )}
+                                  {b.tourGuideName && (
+                                    <span className="flex items-center gap-2">
+                                      <UserIcon className="w-4 h-4 text-[#0EA5E9] fill-sky-100 shrink-0" />
+                                      <span>HDV: <strong className="text-slate-800 font-bold">{b.tourGuideName}</strong></span>
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Footer row inside content */}
+                              <div className="flex items-center justify-between gap-4 mt-4 pt-3 border-t border-slate-50 flex-wrap">
+                                <div>
+                                  <span className="text-slate-400 text-[10px] font-black uppercase tracking-wider block mb-0.5">Tổng thanh toán</span>
+                                  <strong className="text-lg font-black text-slate-900 tracking-tight">
+                                    {b.finalPrice ? b.finalPrice.toLocaleString("vi-VN") + "đ" : "—"}
+                                  </strong>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <Link 
+                                    href={`/profile/bookings/${b.bookingId}`}
+                                    className="px-3.5 py-1.5 text-xs font-black text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition flex items-center gap-1 border border-slate-100"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" /> Chi tiết chuyến đi
+                                  </Link>
+
+                                  {scheduleTab === "in_progress" && (
+                                    <button
+                                      disabled
+                                      className="px-3.5 py-1.5 text-xs font-black text-slate-400 bg-slate-100 rounded-xl border border-slate-200 cursor-not-allowed flex items-center gap-1.5 opacity-60"
+                                      title="Hành trình đang diễn ra, không thể hủy"
+                                    >
+                                      <ShieldAlert className="w-3.5 h-3.5 text-slate-400" /> Hủy Tour
+                                    </button>
+                                  )}
+
+                                  {scheduleTab === "completed" && (
+                                    b.reviewed ? (
+                                      <span className="px-3.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-1">
+                                        ✓ Đã đánh giá
+                                      </span>
+                                    ) : (
+                                      <Link
+                                        href={`/profile/bookings/${b.bookingId}?openReview=true`}
+                                        className="px-4 py-1.5 text-xs font-black text-white bg-gradient-to-r from-[#0EA5E9] to-indigo-500 hover:from-sky-500 hover:to-indigo-600 rounded-xl transition shadow-md shadow-sky-100 flex items-center gap-1.5 active:scale-95 animate-pulse"
+                                      >
+                                        <Zap className="w-3.5 h-3.5 fill-white text-[#0EA5E9] shrink-0" />
+                                        Đánh giá ngay (+50đ)
+                                      </Link>
+                                    )
+                                  )}
+
+                                  {scheduleTab === "cancelled" && (
+                                    b.paymentStatus === "PAID" ? (
+                                      <span className="px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-1">
+                                        <Clock className="w-3.5 h-3.5 fill-amber-500 text-white shrink-0" />
+                                        Đang hoàn tiền
+                                      </span>
+                                    ) : (
+                                      <span className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-1">
+                                        <CheckCircle className="w-3.5 h-3.5 fill-emerald-500 text-white shrink-0" />
+                                        Đã hoàn tiền
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* -- TAB: VOUCHERS (VÍ VOUCHER) -- */}
+            {activeTab === "vouchers" && (() => {
+              const today = new Date();
+              today.setHours(0,0,0,0);
+
+              const processedVouchers = vouchers.map(v => {
+                const isExpired = new Date(v.discount.endDate) < today;
+                const hoursLeft = (new Date(v.discount.endDate).getTime() - Date.now()) / 3600000;
+                const isExpiringSoon = !v.isUsed && !isExpired && hoursLeft <= 24;
+                
+                return { ...v, isExpired, isExpiringSoon };
+              }).sort((a, b) => {
+                const scoreA = (a.isUsed || a.isExpired) ? 1 : 0;
+                const scoreB = (b.isUsed || b.isExpired) ? 1 : 0;
+                if (scoreA !== scoreB) return scoreA - scoreB;
+                
+                const expA = a.isExpiringSoon ? 1 : 0;
+                const expB = b.isExpiringSoon ? 1 : 0;
+                return expB - expA;
+              });
+
+              // Copy helper component inside voucher tab context
+              const VoucherCard = ({ v }: { v: any }) => {
+                const [copied, setCopied] = useState(false);
+                const handleCopy = () => {
+                  navigator.clipboard.writeText(v.discount.code);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                };
+
+                const cardBg = v.isUsed || v.isExpired
+                  ? "grayscale bg-slate-50/10 border-slate-200/40 opacity-75"
+                  : v.isExpiringSoon
+                  ? "border-rose-400/40"
+                  : "border-indigo-400/30";
+
+                const glassStyle = v.isUsed || v.isExpired
+                  ? { background: "linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(203, 213, 225, 0.1) 100%)", backdropFilter: "blur(12px)" }
+                  : v.isExpiringSoon
+                  ? { background: "linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%)", backdropFilter: "blur(12px)" }
+                  : { background: "linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(99, 102, 241, 0.15) 50%, rgba(168, 85, 247, 0.15) 100%)", backdropFilter: "blur(12px)" };
+
+                return (
+                  <div 
+                    className={`relative rounded-3xl p-6 flex flex-col justify-between min-h-[160px] border shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] overflow-hidden ${cardBg}`}
+                    style={glassStyle}
+                  >
+                    {/* Glassmorphic ticket cutout circles */}
+                    <div className="absolute top-1/2 -left-3.5 w-7 h-7 rounded-full bg-[#F5F8F8] -translate-y-1/2 shadow-inner border-r border-slate-100"></div>
+                    <div className="absolute top-1/2 -right-3.5 w-7 h-7 rounded-full bg-[#F5F8F8] -translate-y-1/2 shadow-inner border-l border-slate-100"></div>
+
+                    {/* Dotted cutting line */}
+                    <div className="absolute top-1/2 left-3.5 right-3.5 h-0 border-t-2 border-dashed border-slate-200/50 -translate-y-1/2 pointer-events-none"></div>
+
+                    {/* Top Section */}
+                    <div className="relative z-10 pb-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-0.5">Mã giảm giá</span>
+                          <h3 className="font-extrabold text-slate-800 text-lg leading-tight uppercase">{v.discount.name}</h3>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          {v.isUsed ? (
+                            <span className="text-[9px] font-black bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full uppercase">Đã dùng</span>
+                          ) : v.isExpired ? (
+                            <span className="text-[9px] font-black bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full uppercase">Hết hạn</span>
+                          ) : v.isExpiringSoon ? (
+                            <span className="text-[9px] font-black bg-rose-500 text-white px-2 py-0.5 rounded-full uppercase animate-pulse">Sắp hết hạn</span>
+                          ) : (
+                            <span className="text-[9px] font-black bg-indigo-500 text-white px-2 py-0.5 rounded-full uppercase">Khả dụng</span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs text-slate-500 font-semibold mt-1.5 leading-snug">{v.discount.description}</p>
+                    </div>
+
+                    {/* Bottom Section */}
+                    <div className="relative z-10 pt-5 flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-slate-400 text-[10px] font-bold uppercase">Hạn dùng</div>
+                        <div className="text-xs text-slate-700 font-extrabold">{new Date(v.discount.endDate).toLocaleDateString("vi-VN")}</div>
+                      </div>
+
+                      {!(v.isUsed || v.isExpired) && (
+                        <button
+                          onClick={handleCopy}
+                          className={`px-4 py-1.5 text-xs font-black rounded-xl border transition-all active:scale-95 shrink-0 ${
+                            copied 
+                              ? "bg-emerald-500 border-emerald-500 text-white" 
+                              : v.isExpiringSoon
+                              ? "bg-rose-500 border-rose-500 text-white hover:bg-rose-600"
+                              : "bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100"
+                          }`}
+                        >
+                          {copied ? "Đã chép! ✓" : v.discount.code}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                  <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-purple-500 rounded-full"></span>
+                    Ví Voucher của bạn
+                  </h2>
+
+                  {processedVouchers.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 bg-slate-50/50 rounded-2xl border border-dashed border-slate-100 text-xs font-bold uppercase tracking-wider">
+                      Ví voucher hiện tại đang trống.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                      {processedVouchers.map(v => (
+                        <VoucherCard key={v.id} v={v} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* -- TAB: FAVOURITES -- */}
             {activeTab === "favourites" && (

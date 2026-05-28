@@ -151,6 +151,11 @@ export interface BookingResponseDTO {
   tourGuideName?: string;
   note?: string;
   departureDate?: string;
+  startDate?: string;
+  endDate?: string;
+  tourImage?: string;
+  tourGuidePhone?: string;
+  licensePlate?: string;
 }
 
 // ---------- MoMo Payment ----------

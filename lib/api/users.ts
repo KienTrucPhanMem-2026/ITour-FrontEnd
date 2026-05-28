@@ -27,3 +27,13 @@ export async function updateUserProfileAPI(
   });
   return res.data;
 }
+
+/**
+ * GET /api/users/{id}/vouchers
+ */
+export async function getUserVouchersAPI(id: string): Promise<any[]> {
+  const res = await apiFetch<ApiResponse<any[]>>(`/users/${id}/vouchers`, {
+    method: "GET",
+  });
+  return res.data;
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { NotificationDTO } from "@/types/api";
 
 // ============================================================
@@ -29,6 +30,10 @@ function NotifIcon({ type }: { type: string }) {
     PAYMENT_SUCCESS: {
       bg: "#eff6ff", color: "#3b82f6",
       path: <><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" /></>,
+    },
+    TIER_UPGRADED: {
+      bg: "#fdf4ff", color: "#d946ef",
+      path: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />,
     },
     SYSTEM_ALERT: {
       bg: "#fffbeb", color: "#f59e0b",
@@ -96,6 +101,7 @@ export default function NotificationPanel({
   onMarkAllRead,
 }: NotificationPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -152,7 +158,13 @@ export default function NotificationPanel({
               <li
                 key={n.id}
                 className={`np-item${n.read ? "" : " np-item--unread"}`}
-                onClick={() => { if (!n.read) onMarkRead(n.id); }}
+                onClick={() => {
+                  if (!n.read) onMarkRead(n.id);
+                  if (n.actionUrl) {
+                    router.push(n.actionUrl);
+                    onClose();
+                  }
+                }}
               >
                 {/* Visual */}
                 <NotifIcon type={n.type} />
@@ -163,9 +175,9 @@ export default function NotificationPanel({
                   <p className="np-item__desc">{n.message}</p>
                   <span className="np-item__time">{formatTime(n.createdAt)}</span>
                   {n.actionUrl && (
-                    <Link href={n.actionUrl} className="np-item__cta" onClick={(e) => e.stopPropagation()}>
+                    <span className="np-item__cta">
                       Xem chi tiết →
-                    </Link>
+                    </span>
                   )}
                 </div>
 
