@@ -10,6 +10,7 @@ import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 import { useBookingTimer } from "@/hooks/useBookingTimer";
 import { ApiError } from "@/lib/api/config";
 import type { TourDTO, TourScheduleDTO, PaymentMethod, BookingResponseDTO } from "@/types/api";
+import Header from "@/components/Header";
 
 function formatPrice(amount: number): string {
   return `${(amount / 1_000_000).toFixed(1)}M₫`;
@@ -251,25 +252,7 @@ function PaymentContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#0EA5E9] flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-gray-900">Du Lịch Việt</span>
-          </Link>
-          <h1 className="text-xl font-bold text-gray-900">Xác Nhận Đặt Tour</h1>
-          <div className="text-right">
-            <p className="text-xs text-gray-500">Đặt tour với tư cách</p>
-            <p className="font-semibold text-gray-900 text-sm">{currentUser?.fullName}</p>
-          </div>
-        </div>
-      </header>
+      <Header></Header>
 
       <main className="max-w-6xl mx-auto px-6 py-10">
         {/* API error */}
@@ -345,11 +328,10 @@ function PaymentContent() {
                       key={m.id}
                       type="button"
                       onClick={() => setPaymentMethod(m.id)}
-                      className={`p-4 border-2 rounded-xl transition-all text-center ${
-                        paymentMethod === m.id
+                      className={`p-4 border-2 rounded-xl transition-all text-center ${paymentMethod === m.id
                           ? "border-[#0EA5E9] bg-blue-50"
                           : "border-gray-200 hover:border-gray-300"
-                      }`}
+                        }`}
                     >
                       <div className="text-2xl mb-1">{m.icon}</div>
                       <p className="text-xs font-semibold text-gray-700">{m.label}</p>

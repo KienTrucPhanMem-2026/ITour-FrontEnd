@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import TourCard from "@/components/TourCard";
@@ -16,6 +16,7 @@ type TabType = "info" | "bookings" | "favourites";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>("info");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,6 +38,14 @@ export default function ProfilePage() {
     }
     loadAllData(stored.id);
   }, [router]);
+
+  // React to search param changes
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam === "info" || tabParam === "bookings" || tabParam === "favourites") {
+      setActiveTab(tabParam as TabType);
+    }
+  }, [searchParams]);
 
   const loadAllData = async (userId: string) => {
     setIsLoading(true);
