@@ -24,3 +24,11 @@ export async function getTourByIdAPI(id: string): Promise<TourDTO> {
 export async function getTourItinerariesAPI(tourId: string): Promise<any[]> {
   return apiFetch<any[]>(`/tour-itineraries/tour/${tourId}`);
 }
+
+/**
+ * GET /api/discounts/tour/{tourId} — Lấy danh sách discount của một tour
+ */
+export async function getDiscountsByTourAPI(tourId: string): Promise<any[]> {
+  return apiFetch<any[]>(`/discounts/tour/${tourId}`);
+}
+

@@ -7,6 +7,7 @@ import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 import { getBookingPaymentUrlAPI } from "@/lib/api/bookings";
 import { getTourByIdAPI } from "@/lib/api/tours";
 import { apiFetch } from "@/lib/api/config";
+import Header from "@/components/Header";
 
 function ConfirmationContent() {
   const searchParams = useSearchParams();
@@ -37,6 +38,7 @@ function ConfirmationContent() {
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [repaying, setRepaying] = useState(false);
 
   const fetchBookingDetails = async () => {
     if (!bookingId) return;
@@ -71,6 +73,26 @@ function ConfirmationContent() {
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Không thể tải thông tin đơn hàng.");
+    }
+  };
+
+  const handleRepay = async () => {
+    if (!bookingId) return;
+    setRepaying(true);
+    try {
+      const res = await apiFetch<any>(`/payment/momo/create?bookingId=${bookingId}`, {
+        method: "POST",
+      });
+      if (res && res.payUrl) {
+        window.location.href = res.payUrl;
+      } else {
+        throw new Error("Không lấy được đường dẫn thanh toán mới từ MoMo.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Không thể khởi tạo giao dịch thanh toán mới.");
+    } finally {
+      setRepaying(false);
     }
   };
 
@@ -148,38 +170,23 @@ function ConfirmationContent() {
   }
 
   const isPaid = booking.paymentStatus === "PAID" || booking.status === "PAID";
+  const isFailed = booking.paymentStatus === "FAILED" || booking.status === "CANCELLED" || (resultCode !== null && resultCode !== "0");
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#0EA5E9] flex items-center justify-center">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0110.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <span className="text-xl font-bold text-gray-900">Du Lịch Việt</span>
-          </Link>
-        </div>
-      </header>
+      <Header></Header>
 
       <main className="max-w-2xl mx-auto px-6 py-20">
-        {/* Success Card */}
+        {/* Success/Failure Card */}
         <div className="bg-white rounded-3xl shadow-2xl p-12 text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
-          {/* Success Icon */}
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isPaid ? 'bg-green-50 border border-green-100' : 'bg-amber-50 border border-amber-100'}`}>
+          {/* Status Icon */}
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isPaid
+              ? 'bg-green-50 border border-green-100'
+              : isFailed
+                ? 'bg-red-50 border border-red-100'
+                : 'bg-amber-50 border border-amber-100'
+            }`}>
             {isPaid ? (
               <svg
                 className="w-10 h-10 text-green-600"
@@ -192,6 +199,20 @@ function ConfirmationContent() {
                   strokeLinejoin="round"
                   strokeWidth={2.5}
                   d="M5 13l4 4L19 7"
+                />
+              </svg>
+            ) : isFailed ? (
+              <svg
+                className="w-10 h-10 text-red-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2.5}
+                  d="M6 18L18 6M6 6l12 12"
                 />
               </svg>
             ) : (
@@ -211,14 +232,20 @@ function ConfirmationContent() {
             )}
           </div>
 
-          {/* Success Title */}
+          {/* Title */}
           <h1 className="text-3xl font-black text-gray-900 mb-3 tracking-tight">
-            {isPaid ? "Thanh Toán Thành Công!" : "Đang Xử Lý Thanh Toán..."}
+            {isPaid
+              ? "Thanh Toán Thành Công!"
+              : isFailed
+                ? "Thanh Toán Thất Bại!"
+                : "Đang Xử Lý Thanh Toán..."}
           </h1>
           <p className="text-sm text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
-            {isPaid 
+            {isPaid
               ? "Đơn đặt tour của bạn đã được thanh toán và xác nhận thành công. Hướng dẫn chi tiết đã được gửi đến email của bạn."
-              : "Chúng tôi đang xác nhận thanh toán từ cổng thanh toán MoMo. Vui lòng tải lại trang hoặc kiểm tra chi tiết đơn hàng."}
+              : isFailed
+                ? "Giao dịch thanh toán đã thất bại hoặc bị hủy bỏ. Quý khách vui lòng thanh toán lại hoặc liên hệ bộ phận hỗ trợ."
+                : "Chúng tôi đang xác nhận thanh toán từ cổng thanh toán MoMo. Vui lòng tải lại trang hoặc kiểm tra chi tiết đơn hàng."}
           </p>
 
           {/* Booking Details */}
@@ -262,12 +289,13 @@ function ConfirmationContent() {
 
               <div className="flex justify-between items-center pb-3 border-b border-gray-100">
                 <span className="text-gray-500">Trạng thái:</span>
-                <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider ${
-                  isPaid 
+                <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider ${isPaid
                     ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    : "bg-amber-50 text-amber-600 border border-amber-100"
-                }`}>
-                  {isPaid ? "✓ Đã thanh toán" : "Chờ thanh toán"}
+                    : isFailed
+                      ? "bg-red-50 text-red-600 border border-red-100"
+                      : "bg-amber-50 text-amber-600 border border-amber-100"
+                  }`}>
+                  {isPaid ? "✓ Đã thanh toán" : isFailed ? "Thất bại / Đã hủy" : "Đang xử lý"}
                 </span>
               </div>
 
@@ -320,18 +348,45 @@ function ConfirmationContent() {
 
           {/* Action Buttons */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Link
-              href={`/profile/bookings/${booking.id}`}
-              className="py-3 bg-[#0EA5E9] hover:bg-[#0185B8] text-white font-bold rounded-xl transition-all shadow-md active:scale-95 text-center text-sm font-sans"
-            >
-              Xem Chi Tiết Đơn Hàng
-            </Link>
-            <Link
-              href="/tours"
-              className="py-3 border-2 border-[#0EA5E9] hover:bg-sky-50/50 text-[#0EA5E9] font-bold rounded-xl transition-all active:scale-95 text-center text-sm font-sans"
-            >
-              Khám Phá Tour Khác
-            </Link>
+            {isFailed ? (
+              <>
+                <button
+                  onClick={handleRepay}
+                  disabled={repaying}
+                  className="py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-all shadow-md active:scale-95 text-center text-sm font-sans flex items-center justify-center gap-2"
+                >
+                  {repaying ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Đang tạo liên kết...
+                    </>
+                  ) : (
+                    "Thanh Toán Lại"
+                  )}
+                </button>
+                <Link
+                  href={`/profile/bookings/${booking.id}`}
+                  className="py-3 border-2 border-gray-300 hover:bg-gray-50 text-gray-700 font-bold rounded-xl transition-all active:scale-95 text-center text-sm font-sans"
+                >
+                  Chi Tiết Đơn Hàng
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link
+                  href={`/profile/bookings/${booking.id}`}
+                  className="py-3 bg-[#0EA5E9] hover:bg-[#0185B8] text-white font-bold rounded-xl transition-all shadow-md active:scale-95 text-center text-sm font-sans"
+                >
+                  Xem Chi Tiết Đơn Hàng
+                </Link>
+                <Link
+                  href="/tours"
+                  className="py-3 border-2 border-[#0EA5E9] hover:bg-sky-50/50 text-[#0EA5E9] font-bold rounded-xl transition-all active:scale-95 text-center text-sm font-sans"
+                >
+                  Khám Phá Tour Khác
+                </Link>
+              </>
+            )}
           </div>
         </div>
 
