@@ -130,6 +130,7 @@ export default function ProfilePage() {
   // Cancel Confirmation Modal states
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [bookingIdToCancel, setBookingIdToCancel] = useState<string | null>(null);
+  const [bookingToCancel, setBookingToCancel] = useState<any | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
@@ -150,8 +151,9 @@ export default function ProfilePage() {
     }
   };
 
-  const handleCancelBooking = (bookingId: string) => {
-    setBookingIdToCancel(bookingId);
+  const handleCancelBooking = (booking: any) => {
+    setBookingToCancel(booking);
+    setBookingIdToCancel(booking.bookingId);
     setCancelModalOpen(true);
   };
 
@@ -177,6 +179,7 @@ export default function ProfilePage() {
       setIsCancelling(false);
       setCancelModalOpen(false);
       setBookingIdToCancel(null);
+      setBookingToCancel(null);
     }
   };
 
@@ -549,44 +552,92 @@ export default function ProfilePage() {
                                     <Eye className="w-3.5 h-3.5" /> Chi tiết chuyến đi
                                   </Link>
 
+                                  {scheduleTab === "upcoming" && (() => {
+                                    const start = new Date(b.startDate || b.bookingDate);
+                                    const today = new Date();
+                                    start.setHours(0,0,0,0);
+                                    today.setHours(0,0,0,0);
+                                    const diffTime = start.getTime() - today.getTime();
+                                    const daysBetween = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                    
+                                    if (daysBetween <= 0) {
+                                      return (
+                                        <button
+                                          disabled
+                                          className="px-3.5 py-1.5 text-xs font-black text-slate-400 bg-slate-100 rounded-xl border border-slate-200 cursor-not-allowed flex items-center gap-1.5 opacity-60"
+                                          title="Không thể hủy tour vào ngày khởi hành hoặc sau đó"
+                                        >
+                                          ✕ Hủy Tour
+                                        </button>
+                                      );
+                                    }
+                                    
+                                    return (
+                                      <button
+                                        onClick={() => handleCancelBooking(b)}
+                                        className="px-3.5 py-1.5 text-xs font-black text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition flex items-center gap-1.5 active:scale-95 border border-rose-100/50 shadow-sm"
+                                      >
+                                        ✕ Hủy Tour
+                                      </button>
+                                    );
+                                  })()}
+
                                   {scheduleTab === "in_progress" && (
                                     <button
                                       disabled
                                       className="px-3.5 py-1.5 text-xs font-black text-slate-400 bg-slate-100 rounded-xl border border-slate-200 cursor-not-allowed flex items-center gap-1.5 opacity-60"
                                       title="Hành trình đang diễn ra, không thể hủy"
                                     >
-                                      <ShieldAlert className="w-3.5 h-3.5 text-slate-400" /> Hủy Tour
+                                      ✕ Hủy Tour
                                     </button>
                                   )}
 
                                   {scheduleTab === "completed" && (
-                                    b.reviewed ? (
-                                      <span className="px-3.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-1">
-                                        ✓ Đã đánh giá
-                                      </span>
-                                    ) : (
-                                      <Link
-                                        href={`/profile/bookings/${b.bookingId}?openReview=true`}
-                                        className="px-4 py-1.5 text-xs font-black text-white bg-gradient-to-r from-[#0EA5E9] to-indigo-500 hover:from-sky-500 hover:to-indigo-600 rounded-xl transition shadow-md shadow-sky-100 flex items-center gap-1.5 active:scale-95 animate-pulse"
+                                    <>
+                                      {b.reviewed ? (
+                                        <span className="px-3.5 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-1">
+                                          ✓ Đã đánh giá
+                                        </span>
+                                      ) : (
+                                        <Link
+                                          href={`/profile/bookings/${b.bookingId}?openReview=true`}
+                                          className="px-4 py-1.5 text-xs font-black text-white bg-gradient-to-r from-[#0EA5E9] to-indigo-500 hover:from-sky-500 hover:to-indigo-600 rounded-xl transition shadow-md shadow-sky-100 flex items-center gap-1.5 active:scale-95 animate-pulse"
+                                        >
+                                          <Zap className="w-3.5 h-3.5 fill-white text-[#0EA5E9] shrink-0" />
+                                          Đánh giá ngay (+50đ)
+                                        </Link>
+                                      )}
+                                      <button
+                                        disabled
+                                        className="px-3.5 py-1.5 text-xs font-black text-slate-400 bg-slate-100 rounded-xl border border-slate-200 cursor-not-allowed flex items-center gap-1.5 opacity-60"
+                                        title="Chuyến đi đã hoàn thành, không thể hủy"
                                       >
-                                        <Zap className="w-3.5 h-3.5 fill-white text-[#0EA5E9] shrink-0" />
-                                        Đánh giá ngay (+50đ)
-                                      </Link>
-                                    )
+                                        ✕ Hủy Tour
+                                      </button>
+                                    </>
                                   )}
 
                                   {scheduleTab === "cancelled" && (
-                                    b.paymentStatus === "PAID" ? (
-                                      <span className="px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-1">
-                                        <Clock className="w-3.5 h-3.5 fill-amber-500 text-white shrink-0" />
-                                        Đang hoàn tiền
-                                      </span>
-                                    ) : (
-                                      <span className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-1">
-                                        <CheckCircle className="w-3.5 h-3.5 fill-emerald-500 text-white shrink-0" />
-                                        Đã hoàn tiền
-                                      </span>
-                                    )
+                                    <>
+                                      {b.paymentStatus === "PAID" ? (
+                                        <span className="px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 rounded-xl border border-amber-100 flex items-center gap-1">
+                                          <Clock className="w-3.5 h-3.5 fill-amber-500 text-white shrink-0" />
+                                          Đang hoàn tiền
+                                        </span>
+                                      ) : (
+                                        <span className="px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center gap-1">
+                                          <CheckCircle className="w-3.5 h-3.5 fill-emerald-500 text-white shrink-0" />
+                                          Đã hoàn tiền
+                                        </span>
+                                      )}
+                                      <button
+                                        disabled
+                                        className="px-3.5 py-1.5 text-xs font-black text-slate-400 bg-slate-100 rounded-xl border border-slate-200 cursor-not-allowed flex items-center gap-1.5 opacity-60"
+                                        title="Đơn đặt tour đã bị hủy"
+                                      >
+                                        ✕ Hủy Tour
+                                      </button>
+                                    </>
                                   )}
                                 </div>
                               </div>
@@ -765,41 +816,99 @@ export default function ProfilePage() {
       <Footer />
 
       {/* Custom Cancel Confirmation Modal */}
-      {cancelModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100/80 animate-in zoom-in-95 duration-200 text-center">
-            <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mx-auto mb-4 border border-rose-100">
-              <span className="text-xl">⚠️</span>
-            </div>
-            <h3 className="text-lg font-black text-slate-900 mb-2">Xác nhận hủy đặt tour</h3>
-            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              Bạn có chắc chắn muốn hủy đơn đặt tour này không? Hành động này sẽ hoàn trả các slot giữ chỗ và không thể hoàn tác.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setCancelModalOpen(false);
-                  setBookingIdToCancel(null);
-                }}
-                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all active:scale-[0.98]"
-              >
-                Không, giữ lại
-              </button>
-              <button
-                onClick={confirmCancelBooking}
-                disabled={isCancelling}
-                className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.98] shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
-              >
-                {isCancelling ? (
-                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                ) : (
-                  "Hủy đặt tour"
+      {cancelModalOpen && bookingToCancel && (() => {
+        const isPending = bookingToCancel.status === "PENDING";
+        
+        let title = "Xác nhận hủy đặt tour";
+        let description = "Bạn có chắc chắn muốn hủy đơn đặt tour này không? Slot giữ chỗ sẽ được hoàn lại và không thể hoàn tác.";
+        let buttonText = "Hủy đặt tour";
+        let cannotCancel = false;
+
+        if (!isPending) {
+          const start = new Date(bookingToCancel.startDate || bookingToCancel.bookingDate);
+          const today = new Date();
+          start.setHours(0, 0, 0, 0);
+          today.setHours(0, 0, 0, 0);
+          const diffTime = start.getTime() - today.getTime();
+          const daysBetween = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          let penaltyPercentage = 0.0;
+          let ruleText = "";
+
+          if (daysBetween <= 0) {
+            title = "Không thể hủy tour";
+            description = "Chuyến đi khởi hành vào hôm nay hoặc đã diễn ra. Theo chính sách của iTour, bạn không thể hủy tour vào ngày khởi hành hoặc sau đó!";
+            buttonText = "Đóng";
+            cannotCancel = true;
+          } else {
+            if (daysBetween >= 1 && daysBetween <= 3) {
+              penaltyPercentage = 1.0;
+              ruleText = "hủy trước từ 1 đến 3 ngày, mức phí phạt là 100%";
+            } else if (daysBetween >= 4 && daysBetween <= 7) {
+              penaltyPercentage = 0.9;
+              ruleText = "hủy trước từ 4 đến 7 ngày, mức phí phạt là 90%";
+            } else if (daysBetween >= 8 && daysBetween <= 15) {
+              penaltyPercentage = 0.6;
+              ruleText = "hủy trước từ 8 đến 15 ngày, mức phí phạt là 60%";
+            } else if (daysBetween >= 16 && daysBetween <= 29) {
+              penaltyPercentage = 0.3;
+              ruleText = "hủy trước từ 16 đến 29 ngày, mức phí phạt là 30%";
+            } else if (daysBetween >= 30 && daysBetween <= 45) {
+              penaltyPercentage = 0.1;
+              ruleText = "hủy trước từ 30 đến 45 ngày, mức phí phạt là 10%";
+            } else {
+              penaltyPercentage = 0.0;
+              ruleText = "hủy trước trên 45 ngày, bạn được miễn phí hủy (phí phạt 0%)";
+            }
+
+            const finalPrice = bookingToCancel.finalPrice || 0;
+            const refundAmount = finalPrice * (1.0 - penaltyPercentage);
+            description = `Theo chính sách, bạn hủy trước ${daysBetween} ngày, ${ruleText}. Số tiền bạn được hoàn lại vào ví MoMo là: ${refundAmount.toLocaleString("vi-VN")}đ. Bạn có chắc chắn muốn hủy?`;
+            buttonText = "Đồng ý, hủy tour";
+          }
+        } else {
+          description = "Đơn đặt tour này chưa thanh toán. Bạn có chắc chắn muốn hủy đặt tour này không? Slot giữ chỗ sẽ được hoàn trả và không mất phí phạt nào.";
+        }
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100/80 animate-in zoom-in-95 duration-200 text-center">
+              <div className={`w-12 h-12 ${cannotCancel ? "bg-amber-50 text-amber-500 border-amber-100" : "bg-rose-50 text-rose-500 border-rose-100"} rounded-full flex items-center justify-center mx-auto mb-4 border`}>
+                <span className="text-xl">{cannotCancel ? "⚠️" : "⚠️"}</span>
+              </div>
+              <h3 className="text-lg font-black text-slate-900 mb-2">{title}</h3>
+              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                {description}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setCancelModalOpen(false);
+                    setBookingIdToCancel(null);
+                    setBookingToCancel(null);
+                  }}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all active:scale-[0.98]"
+                >
+                  {cannotCancel ? "Quay lại" : "Không, giữ lại"}
+                </button>
+                {!cannotCancel && (
+                  <button
+                    onClick={confirmCancelBooking}
+                    disabled={isCancelling}
+                    className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.98] shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
+                  >
+                    {isCancelling ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      buttonText
+                    )}
+                  </button>
                 )}
-              </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

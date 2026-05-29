@@ -1341,6 +1341,28 @@ export default function BookingDetailPage() {
 
               {/* Actions */}
               <div className="mt-6 space-y-3">
+                {(() => {
+                  const start = new Date(bookingDto?.startDate || booking?.tourSchedule?.startDate || booking?.bookingDate);
+                  const today = new Date();
+                  start.setHours(0, 0, 0, 0);
+                  today.setHours(0, 0, 0, 0);
+                  const diffTime = start.getTime() - today.getTime();
+                  const daysBetween = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  const canCancelPaid = (status === "PAID" || status === "CONFIRMED") && daysBetween > 0;
+
+                  if (canCancelPaid) {
+                    return (
+                      <button
+                        onClick={() => setCancelModalOpen(true)}
+                        className="w-full py-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 font-black rounded-2xl text-xs uppercase tracking-wider active:scale-[0.98] transition-all"
+                      >
+                        ✕ Hủy đơn đặt tour
+                      </button>
+                    );
+                  }
+                  return null;
+                })()}
+
                 {isPending && !isExpired && (
                   <>
                     <div className="p-4 bg-amber-50/70 border border-amber-100 rounded-2xl">
@@ -1406,34 +1428,95 @@ export default function BookingDetailPage() {
       <Footer />
 
       {/* Cancel Modal */}
-      {cancelModalOpen && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100/80 text-center">
-            <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-rose-100">
-              <span className="text-xl">⚠️</span>
-            </div>
-            <h3 className="text-lg font-black text-slate-900 mb-2">Xác nhận hủy đặt tour</h3>
-            <p className="text-xs text-slate-500 mb-6 leading-relaxed">
-              Bạn có chắc muốn hủy đơn này không? Slot giữ chỗ sẽ được hoàn trả và không thể hoàn tác.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setCancelModalOpen(false)}
-                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all"
-              >
-                Không, giữ lại
-              </button>
-              <button
-                onClick={confirmCancel}
-                disabled={isCancelling}
-                className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
-              >
-                {isCancelling ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : "Hủy đặt tour"}
-              </button>
+      {cancelModalOpen && (() => {
+        const isPending = booking.status === "PENDING";
+        
+        let title = "Xác nhận hủy đặt tour";
+        let description = "Bạn có chắc muốn hủy đơn này không? Slot giữ chỗ sẽ được hoàn trả và không thể hoàn tác.";
+        let buttonText = "Hủy đặt tour";
+        let cannotCancel = false;
+
+        if (!isPending) {
+          const start = new Date(bookingDto?.startDate || booking?.tourSchedule?.startDate || booking?.bookingDate);
+          const today = new Date();
+          start.setHours(0, 0, 0, 0);
+          today.setHours(0, 0, 0, 0);
+          const diffTime = start.getTime() - today.getTime();
+          const daysBetween = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          let penaltyPercentage = 0.0;
+          let ruleText = "";
+
+          if (daysBetween <= 0) {
+            title = "Không thể hủy tour";
+            description = "Chuyến đi khởi hành vào hôm nay hoặc đã diễn ra. Theo chính sách của iTour, bạn không thể hủy tour vào ngày khởi hành hoặc sau đó!";
+            buttonText = "Đóng";
+            cannotCancel = true;
+          } else {
+            if (daysBetween >= 1 && daysBetween <= 3) {
+              penaltyPercentage = 1.0;
+              ruleText = "hủy trước từ 1 đến 3 ngày, mức phí phạt là 100%";
+            } else if (daysBetween >= 4 && daysBetween <= 7) {
+              penaltyPercentage = 0.9;
+              ruleText = "hủy trước từ 4 đến 7 ngày, mức phí phạt là 90%";
+            } else if (daysBetween >= 8 && daysBetween <= 15) {
+              penaltyPercentage = 0.6;
+              ruleText = "hủy trước từ 8 đến 15 ngày, mức phí phạt là 60%";
+            } else if (daysBetween >= 16 && daysBetween <= 29) {
+              penaltyPercentage = 0.3;
+              ruleText = "hủy trước từ 16 đến 29 ngày, mức phí phạt là 30%";
+            } else if (daysBetween >= 30 && daysBetween <= 45) {
+              penaltyPercentage = 0.1;
+              ruleText = "hủy trước từ 30 đến 45 ngày, mức phí phạt là 10%";
+            } else {
+              penaltyPercentage = 0.0;
+              ruleText = "hủy trước trên 45 ngày, bạn được miễn phí hủy (phí phạt 0%)";
+            }
+
+            const finalPrice = booking.finalPrice || 0;
+            const refundAmount = finalPrice * (1.0 - penaltyPercentage);
+            description = `Theo chính sách, bạn hủy trước ${daysBetween} ngày, ${ruleText}. Số tiền bạn được hoàn lại vào ví MoMo là: ${refundAmount.toLocaleString("vi-VN")}đ. Bạn có chắc chắn muốn hủy?`;
+            buttonText = "Đồng ý, hủy tour";
+          }
+        } else {
+          description = "Đơn đặt tour này chưa thanh toán. Bạn có chắc chắn muốn hủy đặt tour này không? Slot giữ chỗ sẽ được hoàn trả và không mất phí phạt nào.";
+        }
+
+        return (
+          <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100/80 animate-in zoom-in-95 duration-200 text-center">
+              <div className={`w-12 h-12 ${cannotCancel ? "bg-amber-50 text-amber-500 border-amber-100" : "bg-rose-50 text-rose-500 border-rose-100"} rounded-full flex items-center justify-center mx-auto mb-4 border`}>
+                <span className="text-xl">{cannotCancel ? "⚠️" : "⚠️"}</span>
+              </div>
+              <h3 className="text-lg font-black text-slate-900 mb-2">{title}</h3>
+              <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                {description}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setCancelModalOpen(false)}
+                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition-all active:scale-[0.98]"
+                >
+                  {cannotCancel ? "Quay lại" : "Không, giữ lại"}
+                </button>
+                {!cannotCancel && (
+                  <button
+                    onClick={confirmCancel}
+                    disabled={isCancelling}
+                    className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.98] shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
+                  >
+                    {isCancelling ? (
+                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      buttonText
+                    )}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Weather Forecast Modal */}
       {weatherModalOpen && (

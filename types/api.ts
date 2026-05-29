@@ -175,11 +175,18 @@ export interface MomoCreatePaymentResponse {
 // ---------- Notification ----------
 export interface NotificationDTO {
   id: string;
-  customerId: string;
+  customerId?: string;
+  user?: {
+    id: string;
+    userName?: string;
+    fullName?: string;
+  };
   title: string;
   message: string;
   type: string;        // VD: BOOKING_SUCCESS, SYSTEM_ALERT
   actionUrl?: string;
   read: boolean;
+  isRead?: boolean;
   createdAt: string;   // ISO datetime string
 }
+
