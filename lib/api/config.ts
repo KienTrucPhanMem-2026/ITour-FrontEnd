@@ -7,7 +7,7 @@ console.log("Production ", process.env.NEXT_PUBLIC_ENVIRONMENT);
 
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_ENVIRONMENT === "PRODUCTION"
-  ? "http://54.254.171.18:8080/api"
+  ? "https://itours.duckdns.org/api"
   : "http://localhost:8080/api";
 /** Lỗi từ API — chứa code, message */
 export class ApiError extends Error {
