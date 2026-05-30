@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTourByIdAPI, getTourItinerariesAPI } from "@/lib/api/tours";
@@ -91,7 +91,7 @@ function formatDate(dateStr?: string): string {
   });
 }
 
-export default function TourDetailPage() {
+function TourDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tourId = searchParams.get("id") || "";
@@ -955,5 +955,15 @@ export default function TourDetailPage() {
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
+  );
+}
+
+export default function TourDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>
+    }>
+      <TourDetailContent />
+    </Suspense>
   );
 }
