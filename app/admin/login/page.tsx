@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { mockAdminAccounts } from "@/lib/mockData";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -15,6 +16,9 @@ export default function AdminLoginPage() {
     password: "",
     rememberMe: false,
   });
+
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -30,39 +34,43 @@ export default function AdminLoginPage() {
     return newErrors;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const newErrors = validateForm();
+    if (isBlocked) return;
 
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
+    throttledSubmit(() => {
+      const newErrors = validateForm();
 
-    setLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      // Check admin credentials
-      const adminAccount = mockAdminAccounts.find(
-        (acc) =>
-          acc.email === formData.email && acc.password === formData.password
-      );
-
-      if (adminAccount) {
-        localStorage.setItem(
-          "currentUser",
-          JSON.stringify(adminAccount.user)
-        );
-        localStorage.setItem("authToken", "admin_token_" + Date.now());
-        localStorage.setItem("userRole", adminAccount.role);
-        setLoading(false);
-        router.push("/admin");
-      } else {
-        setLoading(false);
-        setErrors({ submit: "Email hoặc mật khẩu không chính xác" });
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        return;
       }
-    }, 1500);
+
+      setLoading(true);
+
+      // Simulate API call
+      setTimeout(() => {
+        // Check admin credentials
+        const adminAccount = mockAdminAccounts.find(
+          (acc) =>
+            acc.email === formData.email && acc.password === formData.password
+        );
+
+        if (adminAccount) {
+          localStorage.setItem(
+            "currentUser",
+            JSON.stringify(adminAccount.user)
+          );
+          localStorage.setItem("authToken", "admin_token_" + Date.now());
+          localStorage.setItem("userRole", adminAccount.role);
+          setLoading(false);
+          router.push("/admin");
+        } else {
+          setLoading(false);
+          setErrors({ submit: "Email hoặc mật khẩu không chính xác" });
+        }
+      }, 1500);
+    });
   };
 
   return (
@@ -178,7 +186,7 @@ export default function AdminLoginPage() {
           {/* Login Button */}
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || isBlocked}
             className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white font-bold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {loading ? (

@@ -8,6 +8,7 @@ import Header from "./Header";
 import { loginAPI } from "@/lib/api/auth";
 import { setStoredUser, isAuthenticated } from "@/lib/auth";
 import { ApiError } from "@/lib/api/config";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 // ============================================================
 // LoginPage Component
@@ -41,6 +42,9 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<FormErrors>({});
+
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
 
   // Nếu đã login rồi → redirect về redirect URL hoặc home
   useEffect(() => {
@@ -90,45 +94,49 @@ export default function LoginPage() {
     if (error) setError(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setError(null);
-    if (!validateForm()) return;
+    if (isBlocked) return;
+    
+    throttledSubmit(async () => {
+      setError(null);
+      if (!validateForm()) return;
 
-    setIsLoading(true);
-    try {
-      // Gọi API thật — cookie JWT được set tự động bởi browser
-      const user = await loginAPI({
-        email: formData.email.toLowerCase().trim(),
-        password: formData.password,
-      });
+      setIsLoading(true);
+      try {
+        // Gọi API thật — cookie JWT được set tự động bởi browser
+        const user = await loginAPI({
+          email: formData.email.toLowerCase().trim(),
+          password: formData.password,
+        });
 
-      // Lưu user info (không lưu token — token ở HttpOnly cookie)
-      setStoredUser(user);
+        // Lưu user info (không lưu token — token ở HttpOnly cookie)
+        setStoredUser(user);
 
-      // Xử lý ghi nhớ email
-      if (formData.rememberMe) {
-        localStorage.setItem("rememberEmail", formData.email);
-      } else {
-        localStorage.removeItem("rememberEmail");
-      }
-
-      // Redirect to redirect URL or home page after successful login
-      router.push(redirectUrl);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === 401 || err.code === 400) {
-          setError("Email hoặc mật khẩu không chính xác. Vui lòng thử lại.");
+        // Xử lý ghi nhớ email
+        if (formData.rememberMe) {
+          localStorage.setItem("rememberEmail", formData.email);
         } else {
-          setError(err.message);
+          localStorage.removeItem("rememberEmail");
         }
-      } else {
-        setError("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
+
+        // Redirect to redirect URL or home page after successful login
+        router.push(redirectUrl);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          if (err.code === 401 || err.code === 400) {
+            setError("Email hoặc mật khẩu không chính xác. Vui lòng thử lại.");
+          } else {
+            setError(err.message);
+          }
+        } else {
+          setError("Đã xảy ra lỗi không xác định. Vui lòng thử lại.");
+        }
+        console.error("Login error:", err);
+      } finally {
+        setIsLoading(false);
       }
-      console.error("Login error:", err);
-    } finally {
-      setIsLoading(false);
-    }
+    });
   };
 
   return (
@@ -287,7 +295,7 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isLoading || isBlocked}
               className="w-full py-3.5 bg-white hover:bg-white/90 text-slate-900 font-bold text-sm rounded-full shadow-lg shadow-black/10 transition-all duration-200 flex items-center justify-center gap-2 disabled:bg-white/60 disabled:cursor-not-allowed"
             >
               {isLoading ? (

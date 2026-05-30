@@ -8,6 +8,7 @@ import Header from "@/components/Header";
 import { registerAPI } from "@/lib/api/auth";
 import { setStoredUser } from "@/lib/auth";
 import { ApiError } from "@/lib/api/config";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 // ============================================================
 // RegisterPage — Gọi thật: POST /api/auth/register
@@ -30,6 +31,9 @@ export default function RegisterPage() {
     confirmPassword: "",
     agreeToTerms: false,
   });
+
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
 
   // ---------- Validation ----------
   const validateForm = () => {
@@ -67,16 +71,19 @@ export default function RegisterPage() {
   };
 
   // ---------- Submit ----------
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setApiError(null);
-    const newErrors = validateForm();
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
+    if (isBlocked) return;
 
-    setLoading(true);
+    throttledSubmit(async () => {
+      setApiError(null);
+      const newErrors = validateForm();
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        return;
+      }
+
+      setLoading(true);
     try {
       const user = await registerAPI({
         userName: formData.userName.trim(),
@@ -101,9 +108,10 @@ export default function RegisterPage() {
         setApiError("Đã xảy ra lỗi. Vui lòng thử lại.");
       }
       console.error("Register error:", err);
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   const setField = (field: string, value: string | boolean) => {
@@ -355,7 +363,7 @@ export default function RegisterPage() {
             <div className="md:col-span-2 mt-4">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isBlocked}
                 className="w-full py-3.5 bg-white hover:bg-white/90 text-slate-900 font-bold text-sm rounded-full shadow-lg shadow-black/10 transition-all duration-200 flex items-center justify-center gap-2 disabled:bg-white/60 disabled:cursor-not-allowed"
               >
                 {loading ? (
