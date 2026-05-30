@@ -65,6 +65,15 @@ export default function ChatWidget({
   const [showPreChatForm, setShowPreChatForm] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+
+  // --- Resize States ---
+  const [chatWidth, setChatWidth] = useState(380);
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(380);
+
+  const MIN_CHAT_WIDTH = 320;
+  const MAX_CHAT_WIDTH = 800;
   
   // --- Rating States ---
   const [rating, setRating] = useState<number | null>(null);
@@ -110,6 +119,7 @@ export default function ChatWidget({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const aiEventSourceRef = useRef<EventSource | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -273,6 +283,42 @@ export default function ChatWidget({
       }
     };
   }, []);
+
+  // --- Horizontal Resize Handlers ---
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      e.preventDefault();
+      // Since widget is anchored to the right, dragging left increases width
+      const delta = startXRef.current - e.clientX;
+      const newWidth = Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, startWidthRef.current + delta));
+      setChatWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = chatWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
 
   // --- Socket.io Listeners ---
@@ -631,7 +677,16 @@ export default function ChatWidget({
     aiEventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
-      const token = event.data;
+      let token = event.data;
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed && typeof parsed.token === "string") {
+          token = parsed.token;
+        }
+      } catch (e) {
+        // Fallback to raw data if not JSON
+      }
+      
       setAiMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId ? { ...msg, content: msg.content + token } : msg
@@ -808,7 +863,19 @@ export default function ChatWidget({
 
       {/* Main Chat Box Container */}
       {isOpen && (
-        <div className="w-[380px] h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300">
+        <div
+          ref={chatContainerRef}
+          style={{ width: `${chatWidth}px` }}
+          className="h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300 relative"
+        >
+          {/* Left Resize Handle */}
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-50 group hover:bg-sky-400/20 transition-colors"
+            title="Kéo để thay đổi kích thước"
+          >
+            <div className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-10 rounded-full bg-gray-300 group-hover:bg-sky-500 transition-colors" />
+          </div>
           {/* Header */}
           <div className="px-5 py-4 flex items-center justify-between shadow-sm text-white bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] shrink-0">
             <div className="flex items-center gap-3">
