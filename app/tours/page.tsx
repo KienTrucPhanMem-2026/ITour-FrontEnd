@@ -12,6 +12,7 @@ import Footer from "@/components/Footer";
 import SearchBar from "@/components/SearchBar";
 import type { SearchSuggestion } from "@/components/SearchBar";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { isDomesticTour } from "@/lib/tourHelpers";
 
 const TOUR_TYPE_LABELS: Record<string, string> = {
@@ -82,7 +83,7 @@ function CollapsePanel({ title, isOpen, onToggle, children }: CollapsePanelProps
   );
 }
 
-export default function ToursPage() {
+function ToursPageContent() {
   const [allTours, setAllTours] = useState<TourDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -611,5 +612,17 @@ export default function ToursPage() {
       {/* ── Footer ── */}
       <Footer></Footer>
     </div>
+  );
+}
+
+export default function ToursPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F8F8]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600" />
+      </div>
+    }>
+      <ToursPageContent />
+    </Suspense>
   );
 }
