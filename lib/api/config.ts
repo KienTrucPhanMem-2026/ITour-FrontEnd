@@ -51,6 +51,11 @@ export async function apiFetch<T>(
     throw new ApiError(401, "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
   }
 
+  // Xử lý 429 — Rate limited (gửi request quá nhanh)
+  if (res.status === 429) {
+    throw new ApiError(429, "Bạn đang gửi yêu cầu quá nhanh. Vui lòng chờ một lúc rồi thử lại.");
+  }
+
   // Xử lý 204 No Content
   if (res.status === 204) {
     return undefined as unknown as T;
