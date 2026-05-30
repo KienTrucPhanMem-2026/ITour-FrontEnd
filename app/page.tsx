@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import TourCard from "@/components/TourCard";
 import TourCarousel from "@/components/TourCarousel";
 import SearchBar from "@/components/SearchBar";
+import type { SearchSuggestion } from "@/components/SearchBar";
 import { getToursAPI } from "@/lib/api/tours";
 import type { TourDTO } from "@/types/api";
 import Footer from "@/components/Footer";
@@ -12,8 +14,67 @@ import Header from "@/components/Header";
 import { isDomesticTour } from "@/lib/tourHelpers";
 
 export default function HomePage() {
+  const router = useRouter();
   const [allTours, setAllTours] = useState<TourDTO[]>([]);
   const [loadingTours, setLoadingTours] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Tính suggestions từ allTours dựa trên searchQuery
+  const suggestions = useMemo<SearchSuggestion[]>(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+
+    const results: SearchSuggestion[] = [];
+
+    // 1. Nhóm theo điểm khởi hành (startDestinationName)
+    const destMap = new Map<string, number>();
+    allTours.forEach((t) => {
+      const dest = t.startDestinationName;
+      if (dest?.toLowerCase().includes(q)) {
+        destMap.set(dest, (destMap.get(dest) ?? 0) + 1);
+      }
+    });
+    destMap.forEach((count, label) => {
+      results.push({ type: "destination", label, count });
+    });
+
+    // 2. Nhóm theo điểm đến (endDestinationName)
+    const endMap = new Map<string, number>();
+    allTours.forEach((t) => {
+      const dest = t.endDestinationName;
+      if (dest?.toLowerCase().includes(q) && dest !== t.startDestinationName) {
+        endMap.set(dest, (endMap.get(dest) ?? 0) + 1);
+      }
+    });
+    endMap.forEach((count, label) => {
+      results.push({ type: "destination", label, count });
+    });
+
+    // 3. Tên tour khớp từ khóa (tối đa 5)
+    allTours
+      .filter((t) => t.name?.toLowerCase().includes(q))
+      .slice(0, 5)
+      .forEach((t) => {
+        results.push({
+          type: "tour",
+          label: t.name ?? "",
+          sublabel: [t.startDestinationName, t.endDestinationName]
+            .filter(Boolean)
+            .join(" → "),
+        });
+      });
+
+    return results.slice(0, 10);
+  }, [allTours, searchQuery]);
+
+  const handleSearch = (value: string) => {
+    const query = value.trim();
+    if (query) {
+      router.push(`/tours?q=${encodeURIComponent(query)}`);
+    } else {
+      router.push("/tours");
+    }
+  };
 
   useEffect(() => {
     getToursAPI()
@@ -29,12 +90,12 @@ export default function HomePage() {
   return (
     <div className="min-h-screen bg-white">
       <Header></Header>
-      
+
       {/* ── 1. Hero Section ── */}
-      <section className="relative min-h-[85vh] flex items-center overflow-hidden bg-slate-900">
-        <div className="absolute inset-0 z-0">
-          <img 
-            src="https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=2070" 
+      <section className="relative min-h-[85vh] flex items-center bg-slate-900">
+        <div className="absolute inset-0 z-0 overflow-hidden">
+          <img
+            src="https://images.unsplash.com/photo-1528127269322-539801943592?q=80&w=2070"
             className="w-full h-full object-cover opacity-50 shadow-2xl"
             alt="Hero Background"
           />
@@ -47,16 +108,23 @@ export default function HomePage() {
               Khám phá Việt Nam cùng chuyên gia
             </span>
             <h1 className="text-5xl md:text-7xl font-black text-white mb-8 leading-[1.1] tracking-tight">
-              Hành trình <br /> 
+              Hành trình <br />
               <span className="text-sky-400">di sản & cảm xúc.</span>
-            </h1>            
-            <SearchBar placeholder="Bạn muốn đi đâu?" variant="glass" />
+            </h1>
+            <SearchBar
+              placeholder="Bạn muốn đi đâu?"
+              variant="glass"
+              onSearch={handleSearch}
+              onQueryChange={setSearchQuery}
+              onSelectSuggestion={(s) => handleSearch(s.label)}
+              suggestions={suggestions}
+            />
           </div>
         </div>
       </section>
 
       {/* ── 2. Stats Section ── */}
-      <section className="relative z-20 -mt-16 max-w-5xl mx-auto px-6">
+      <section className="relative  -mt-16 max-w-5xl mx-auto px-6">
         <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-100 p-8 md:p-12 grid grid-cols-2 md:grid-cols-4 gap-8">
           {[
             { label: "Kinh nghiệm", value: "10+", sub: "Năm dẫn đầu" },
@@ -88,12 +156,12 @@ export default function HomePage() {
 
         {/* Bento Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          
+
           {/* Card 1: Hạ Long (Spans 2 columns, 2 rows) */}
           <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-2 md:row-span-2 h-[500px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
-            <img 
-              src="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=1000&fit=crop" 
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+            <img
+              src="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=1000&fit=crop"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
               alt="Hạ Long"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent" />
@@ -117,9 +185,9 @@ export default function HomePage() {
 
           {/* Card 2: Sapa (Spans 2 columns, 1 row) */}
           <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-2 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
-            <img 
-              src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=400&fit=crop" 
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+            <img
+              src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=400&fit=crop"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
               alt="Sapa"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent" />
@@ -143,9 +211,9 @@ export default function HomePage() {
 
           {/* Card 3: Hội An (Spans 1 column, 1 row) */}
           <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-1 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
-            <img 
-              src="https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=400&h=400&fit=crop" 
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+            <img
+              src="https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=400&h=400&fit=crop"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
               alt="Hội An"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent" />
@@ -167,9 +235,9 @@ export default function HomePage() {
 
           {/* Card 4: Phú Quốc (Spans 1 column, 1 row) */}
           <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-1 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
-            <img 
-              src="https://images.unsplash.com/photo-1564760055-e1993d43e54f?w=400&h=400&fit=crop" 
-              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+            <img
+              src="https://images.unsplash.com/photo-1564760055-e1993d43e54f?w=400&h=400&fit=crop"
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
               alt="Phú Quốc"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent" />
@@ -232,9 +300,9 @@ export default function HomePage() {
         <div className="relative rounded-[3.5rem] overflow-hidden bg-slate-950 text-white p-10 md:p-16 border border-slate-800 shadow-2xl">
           {/* Background overlay */}
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1200')] bg-cover bg-center opacity-[0.06] z-0 pointer-events-none" />
-          
+
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-            
+
             {/* Left Content */}
             <div className="lg:col-span-7">
               <span className="inline-block px-4 py-1.5 mb-6 text-xs font-black tracking-[0.2em] text-emerald-400 uppercase bg-emerald-500/10 border border-emerald-500/20 rounded-full">
@@ -276,11 +344,11 @@ export default function HomePage() {
             {/* Right Content: VIP Ticket Mockup */}
             <div className="lg:col-span-5 flex justify-center items-center">
               <div className="relative w-[345px] h-[190px] rounded-3xl bg-gradient-to-br from-slate-900 to-emerald-950 border border-emerald-500/35 shadow-2xl p-6 overflow-hidden flex flex-col justify-between backdrop-blur-lg hover:scale-105 hover:-rotate-1 transition-transform duration-500 group">
-                
+
                 {/* Torn Ticket Cuts */}
                 <div className="absolute top-1/2 -translate-y-1/2 -left-3 w-6 h-6 bg-slate-950 rounded-full border-r border-emerald-500/20 z-10" />
                 <div className="absolute top-1/2 -translate-y-1/2 -right-3 w-6 h-6 bg-slate-950 rounded-full border-l border-emerald-500/20 z-10" />
-                
+
                 {/* Dashed Line Separation */}
                 <div className="absolute top-4 bottom-4 left-[245px] w-0 border-l border-dashed border-emerald-500/20" />
 
@@ -297,7 +365,7 @@ export default function HomePage() {
                       Áp dụng cho mọi hành trình
                     </p>
                   </div>
-                  
+
                   {/* Barcode representation */}
                   <div className="flex items-center gap-[2px] mt-4 h-6 opacity-75">
                     <div className="w-[2px] h-full bg-white" />
@@ -406,8 +474,8 @@ export default function HomePage() {
       <section className="bg-slate-50 py-32 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-2xl mx-auto mb-20">
-             <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tight">Giá Trị Mang Lại.</h2>
-             <p className="text-slate-500">Tận tâm trong từng khâu dịch vụ để hành trình của bạn là duy nhất và đáng nhớ.</p>
+            <h2 className="text-4xl font-black text-slate-900 mb-6 tracking-tight">Giá Trị Mang Lại.</h2>
+            <p className="text-slate-500">Tận tâm trong từng khâu dịch vụ để hành trình của bạn là duy nhất và đáng nhớ.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
