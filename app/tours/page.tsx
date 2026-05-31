@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { getToursAPI } from "@/lib/api/tours";
+import { getLocationsAPI, type LocationDTO } from "@/lib/api/locations";
 import { getStoredUser, clearStoredUser } from "@/lib/auth";
 import { logoutAPI } from "@/lib/api/auth";
 import type { TourDTO, UserProfile } from "@/types/api";
@@ -96,7 +97,7 @@ function ToursPageContent() {
     geo: true,      // Địa lý
     type: true,     // Loại tour
     price: false,   // Ngân sách
-    startDest: false,// Điểm khởi hành
+    location: false, // Địa điểm
     vehicle: false, // Phương tiện
     date: false,    // Ngày đi
     sort: false,    // Sắp xếp
@@ -113,11 +114,15 @@ function ToursPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<string | null>(null);
-  const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
+  // Location filter: phân cấp country → city
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null); // location id
+  const [selectedCity, setSelectedCity] = useState<string | null>(null);       // location id
   const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
   const [startDateFrom, setStartDateFrom] = useState<string>("");
   const [startDateTo, setStartDateTo] = useState<string>("");
   const [sortBy, setSortBy] = useState<"price-asc" | "price-desc" | "rating" | "available">("rating");
+  const [locations, setLocations] = useState<LocationDTO[]>([]);
+  const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set());
 
   // Suggestions cho autocomplete search
   const suggestions = useMemo<SearchSuggestion[]>(() => {
@@ -170,6 +175,7 @@ function ToursPageContent() {
   useEffect(() => {
     setCurrentUser(getStoredUser());
     fetchTours();
+    getLocationsAPI().then(setLocations).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -218,15 +224,43 @@ function ToursPageContent() {
     [allTours]
   );
 
-  const destinations = useMemo(() =>
-    Array.from(new Set(allTours.map(t => t.startDestinationName).filter(Boolean))) as string[],
-    [allTours]
-  );
+  // Hierarchical location tree: chỉ lấy COUNTRY và CITY_PROVINCE, bỏ ATTRACTION
+  const locationTree = useMemo(() => {
+    const countries = locations.filter(l => l.type === "COUNTRY");
+    const cities = locations.filter(l => l.type === "CITY_PROVINCE");
+    return countries.map(country => ({
+      ...country,
+      cities: cities.filter(c => c.parentId === country.id),
+    }));
+  }, [locations]);
+
+  // Collect all city/country names that appear in tours (start or end)
+  const tourLocationNames = useMemo(() => {
+    const names = new Set<string>();
+    allTours.forEach(t => {
+      if (t.startDestinationName) names.add(t.startDestinationName.toLowerCase());
+      if (t.endDestinationName) names.add(t.endDestinationName.toLowerCase());
+    });
+    return names;
+  }, [allTours]);
 
   const vehicleTypes = useMemo(() =>
     Array.from(new Set(allTours.map(t => t.vehicleType).filter(Boolean))) as string[],
     [allTours]
   );
+
+  // Helper: đếm số tour khớp với 1 location node (country hoặc city)
+  const countToursForLocation = (loc: LocationDTO, cities?: LocationDTO[]): number => {
+    const matchNames = new Set<string>();
+    matchNames.add(loc.name.toLowerCase());
+    // Nếu là country, cộng thêm tất cả city con
+    if (cities) cities.forEach(c => matchNames.add(c.name.toLowerCase()));
+    return allTours.filter(t => {
+      const start = t.startDestinationName?.toLowerCase() ?? "";
+      const end = t.endDestinationName?.toLowerCase() ?? "";
+      return matchNames.has(start) || matchNames.has(end);
+    }).length;
+  };
 
   // Filter & Sort logic
   const filtered = useMemo(() => {
@@ -261,9 +295,27 @@ function ToursPageContent() {
         return false;
       }
 
-      // Destination
-      if (selectedDestination && tour.startDestinationName !== selectedDestination) {
-        return false;
+      // Location filter (phân cấp)
+      if (selectedCity || selectedCountry) {
+        // Ưu tiên city nếu đã chọn
+        const activeLocId = selectedCity ?? selectedCountry;
+        const activeLoc = locations.find(l => l.id === activeLocId);
+        if (activeLoc) {
+          // Build tập hợp tên cần khớp
+          const matchNames = new Set<string>();
+          matchNames.add(activeLoc.name.toLowerCase());
+          // Nếu chọn country → cộng thêm tất cả city con
+          if (activeLoc.type === "COUNTRY") {
+            locations
+              .filter(l => l.parentId === activeLoc.id && l.type === "CITY_PROVINCE")
+              .forEach(c => matchNames.add(c.name.toLowerCase()));
+          }
+          const start = tour.startDestinationName?.toLowerCase() ?? "";
+          const end = tour.endDestinationName?.toLowerCase() ?? "";
+          if (!matchNames.has(start) && !matchNames.has(end)) {
+            return false;
+          }
+        }
       }
 
       // Vehicle
@@ -281,7 +333,7 @@ function ToursPageContent() {
 
       return true;
     });
-  }, [allTours, searchTerm, selectedType, priceRange, selectedDestination, selectedVehicle, startDateFrom, startDateTo, selectedGeo]);
+  }, [allTours, searchTerm, selectedType, priceRange, selectedCountry, selectedCity, selectedVehicle, startDateFrom, startDateTo, selectedGeo, locations]);
 
   // Sort
   const sorted = useMemo(() => {
@@ -469,24 +521,104 @@ function ToursPageContent() {
                   </div>
                 </CollapsePanel>
 
-                {/* Destination */}
-                {destinations.length > 0 && (
+                {/* Địa điểm (phân cấp) */}
+                {locationTree.length > 0 && (
                   <CollapsePanel
-                    title="Điểm khởi hành"
-                    isOpen={expandedSections.startDest}
-                    onToggle={() => toggleSection("startDest")}
+                    title="Địa điểm"
+                    isOpen={expandedSections.location}
+                    onToggle={() => toggleSection("location")}
                   >
-                    <select
-                      value={selectedDestination ?? ""}
-                      onChange={(e) => setSelectedDestination(e.target.value || null)}
-                      className="w-full text-xs px-2.5 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none">
-                      <option value="">Tất cả</option>
-                      {destinations.map(dest => (
-                        <option key={dest} value={dest}>{dest}</option>
-                      ))}
-                    </select>
+                    <div className="space-y-0.5 max-h-72 overflow-y-auto pr-1">
+                      {/* Tất cả */}
+                      <button
+                        onClick={() => { setSelectedCountry(null); setSelectedCity(null); }}
+                        className={`w-full text-left px-2 py-1.5 text-[11px] rounded-lg transition font-medium ${
+                          !selectedCountry && !selectedCity
+                            ? "bg-sky-50 text-sky-700 font-semibold"
+                            : "text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        <span className="flex items-center justify-between">
+                          <span>Tất cả</span>
+                          <span className="text-[10px] text-gray-400">{allTours.length}</span>
+                        </span>
+                      </button>
+
+                      {/* Cây phân cấp */}
+                      {locationTree
+                        .filter(country => countToursForLocation(country, country.cities) > 0)
+                        .map(country => {
+                          const countryTourCount = countToursForLocation(country, country.cities);
+                          const isCountrySelected = selectedCountry === country.id && !selectedCity;
+                          const isExpanded = expandedCountries.has(country.id);
+                          const activeCities = country.cities.filter(c => countToursForLocation(c) > 0);
+
+                          return (
+                            <div key={country.id}>
+                              {/* Country row */}
+                              <div className="flex items-center gap-0.5">
+                                {activeCities.length > 0 ? (
+                                  <button
+                                    onClick={() => setExpandedCountries(prev => {
+                                      const next = new Set(prev);
+                                      next.has(country.id) ? next.delete(country.id) : next.add(country.id);
+                                      return next;
+                                    })}
+                                    className="p-0.5 text-gray-400 hover:text-sky-500 transition flex-shrink-0"
+                                  >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}
+                                      style={{ transition: "transform 0.15s", transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)" }}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 18l6-6-6-6" />
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <div className="w-5 flex-shrink-0" />
+                                )}
+
+                                <button
+                                  onClick={() => { setSelectedCountry(country.id); setSelectedCity(null); }}
+                                  className={`flex-1 text-left px-2 py-1 text-[11px] rounded-lg transition ${
+                                    isCountrySelected
+                                      ? "bg-sky-100 text-sky-700 font-bold"
+                                      : "text-gray-700 hover:bg-gray-50"
+                                  }`}
+                                >
+                                  <span className="flex items-center justify-between">
+                                    <span className="font-semibold">{country.name}</span>
+                                    <span className="text-[10px] text-gray-400">{countryTourCount}</span>
+                                  </span>
+                                </button>
+                              </div>
+
+                              {/* City children */}
+                              {isExpanded && activeCities.map(city => {
+                                const cityCount = countToursForLocation(city);
+                                const isCitySelected = selectedCity === city.id;
+                                return (
+                                  <button
+                                    key={city.id}
+                                    onClick={() => { setSelectedCity(city.id); setSelectedCountry(country.id); }}
+                                    className={`w-full text-left pl-8 pr-2 py-1 text-[10.5px] rounded-lg transition ${
+                                      isCitySelected
+                                        ? "bg-sky-50 text-sky-600 font-semibold"
+                                        : "text-gray-500 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    <span className="flex items-center justify-between">
+                                      <span>└ {city.name}</span>
+                                      <span className="text-[10px] text-gray-400">{cityCount}</span>
+                                    </span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          );
+                        })
+                      }
+                    </div>
                   </CollapsePanel>
                 )}
+
 
                 {/* Vehicle */}
                 {vehicleTypes.length > 0 && (
@@ -548,7 +680,9 @@ function ToursPageContent() {
                     setSearchTerm("");
                     setSelectedType(null);
                     setPriceRange(null);
-                    setSelectedDestination(null);
+                    setSelectedCountry(null);
+                    setSelectedCity(null);
+                    setExpandedCountries(new Set());
                     setSelectedVehicle(null);
                     setStartDateFrom("");
                     setStartDateTo("");
@@ -592,7 +726,9 @@ function ToursPageContent() {
                     setSearchTerm("");
                     setSelectedType(null);
                     setPriceRange(null);
-                    setSelectedDestination(null);
+                    setSelectedCountry(null);
+                    setSelectedCity(null);
+                    setExpandedCountries(new Set());
                     setSelectedVehicle(null);
                     setStartDateFrom("");
                     setStartDateTo("");
