@@ -12,12 +12,25 @@ import type { TourDTO, UserProfile } from "@/types/api";
 import Header from "@/components/Header";
 import { useThrottledAction } from "@/hooks/useThrottledAction";
 
+interface Venue {
+  id: string;
+  name: string;
+  address?: string;
+  phone?: string;
+  description?: string;
+  price?: number;
+}
+
 interface ItineraryDetail {
   id: string;
   timeFrame: string;
   activityType: "TRANSPORT" | "DINING" | "VISIT" | "CHECKIN" | string;
   title: string;
   note?: string;
+  location?: { id: string; name: string };
+  hotel?: Venue;
+  restaurant?: Venue;
+  service?: Venue;
 }
 
 interface TourItinerary {
@@ -519,65 +532,102 @@ function TourDetailContent() {
                   {(() => {
                     const activeDay = itineraries.find((d) => d.dayNumber === selectedDayNumber);
                     if (!activeDay) return null;
+
+                    const ACT_CONFIG: Record<string, { emoji: string; badge: string; dot: string; border: string; label: string }> = {
+                      TRANSPORT: { emoji: "🚌", badge: "bg-blue-100 text-blue-700",    dot: "bg-blue-500",    border: "border-blue-200",   label: "Di chuyển" },
+                      DINING:    { emoji: "🍽️", badge: "bg-amber-100 text-amber-700",  dot: "bg-amber-500",  border: "border-amber-200", label: "Ăn uống" },
+                      VISIT:     { emoji: "🎟️", badge: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-500", border: "border-emerald-200", label: "Tham quan" },
+                      CHECKIN:   { emoji: "🏨", badge: "bg-purple-100 text-purple-700", dot: "bg-purple-500", border: "border-purple-200", label: "Nghỉ dưỡng" },
+                    };
+
                     return (
-                      <div className="bg-gradient-to-br from-sky-50/50 to-slate-50/50 rounded-3xl p-6 md:p-8 border border-sky-100/70 shadow-sm">
-                        <div className="mb-6">
-                          <h3 className="text-xl font-bold text-slate-900 mb-2">
-                            {activeDay.title}
-                          </h3>
+                      <div className="bg-gradient-to-br from-sky-50/30 to-white rounded-3xl p-6 md:p-8 border border-sky-100/70 shadow-sm">
+                        <div className="mb-8">
+                          <h3 className="text-xl font-extrabold text-slate-900 mb-1">{activeDay.title}</h3>
                           {activeDay.description && (
-                            <p className="text-slate-600 font-light leading-relaxed text-sm">
-                              {activeDay.description}
-                            </p>
+                            <p className="text-slate-500 font-light leading-relaxed text-sm">{activeDay.description}</p>
                           )}
                         </div>
 
-                        {/* Timeline of details */}
                         {activeDay.itineraryDetails && activeDay.itineraryDetails.length > 0 ? (
-                          <div className="relative pl-6 border-l-2 border-sky-200 space-y-6 ml-2">
-                            {activeDay.itineraryDetails.map((detail) => {
-                              // Determine icon and color based on activity type
-                              let typeLabel = "Hoạt động";
-                              let typeBg = "bg-slate-100 text-slate-600";
-                              if (detail.activityType === "TRANSPORT") {
-                                typeLabel = "Di chuyển";
-                                typeBg = "bg-blue-100 text-blue-600";
-                              } else if (detail.activityType === "DINING") {
-                                typeLabel = "Ăn uống";
-                                typeBg = "bg-amber-100 text-amber-600";
-                              } else if (detail.activityType === "VISIT") {
-                                typeLabel = "Tham quan";
-                                typeBg = "bg-emerald-100 text-emerald-600";
-                              } else if (detail.activityType === "CHECKIN") {
-                                typeLabel = "Khách sạn";
-                                typeBg = "bg-purple-100 text-purple-600";
-                              }
+                          <div className="space-y-4">
+                            {activeDay.itineraryDetails.map((detail, idx) => {
+                              const cfg = ACT_CONFIG[detail.activityType] ?? { emoji: "📌", badge: "bg-slate-100 text-slate-600", dot: "bg-slate-400", border: "border-slate-200", label: detail.activityType };
+                              const venue = detail.hotel ?? detail.restaurant ?? detail.service ?? null;
 
                               return (
-                                <div key={detail.id} className="relative">
-                                  {/* Timeline dot */}
-                                  <div className="absolute -left-[31px] top-1 w-3 h-3 rounded-full bg-sky-500 border-2 border-white shadow"></div>
-
-                                  <div className="bg-white rounded-2xl p-4 border border-slate-100 hover:shadow-sm transition-all">
-                                    <div className="flex flex-wrap items-center gap-3 mb-2">
-                                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${typeBg}`}>
-                                        {typeLabel}
-                                      </span>
-                                      <span className="text-xs text-slate-400 font-semibold">{detail.timeFrame}</span>
+                                <div key={detail.id} className="flex gap-4">
+                                  {/* Left: Time + connector */}
+                                  <div className="flex flex-col items-center flex-shrink-0">
+                                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg shadow-sm border-2 ${cfg.border} bg-white`}>
+                                      {cfg.emoji}
                                     </div>
-                                    <h4 className="text-sm font-bold text-slate-800 mb-1">{detail.title}</h4>
-                                    {detail.note && (
-                                      <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-2 rounded-xl border border-slate-100 mt-2">
-                                        💡 {detail.note}
-                                      </p>
+                                    {idx < activeDay.itineraryDetails.length - 1 && (
+                                      <div className="w-0.5 flex-1 mt-2 mb-0 bg-gradient-to-b from-slate-200 to-transparent min-h-[20px]" />
                                     )}
+                                  </div>
+
+                                  {/* Right: Card */}
+                                  <div className="flex-1 pb-4">
+                                    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden hover:shadow-md transition-all">
+                                      {/* Card Header */}
+                                      <div className="px-4 pt-4 pb-3">
+                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                          <span className={`text-[9px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider ${cfg.badge}`}>
+                                            {cfg.label}
+                                          </span>
+                                          <span className="text-[11px] text-slate-400 font-semibold font-mono">{detail.timeFrame}</span>
+                                        </div>
+                                        <h4 className="text-sm font-bold text-slate-900">{detail.title}</h4>
+                                        {detail.note && (
+                                          <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                                            💬 {detail.note}
+                                          </p>
+                                        )}
+                                      </div>
+
+                                      {/* Venue info card (hotel / restaurant / service) */}
+                                      {venue && (
+                                        <div className="mx-4 mb-4 px-3 py-2.5 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 flex items-start gap-3">
+                                          <span className="text-base flex-shrink-0 mt-0.5">
+                                            {detail.hotel ? "🏨" : detail.restaurant ? "🍜" : "🎫"}
+                                          </span>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-bold text-slate-800 truncate">{venue.name}</p>
+                                            {venue.address && (
+                                              <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                                                <span>📍</span>
+                                                <span className="truncate">{venue.address}</span>
+                                              </p>
+                                            )}
+                                            {venue.phone && (
+                                              <p className="text-[10px] text-sky-600 mt-0.5 flex items-center gap-1">
+                                                <span>📞</span>
+                                                <span>{venue.phone}</span>
+                                              </p>
+                                            )}
+                                            {detail.service?.price && (
+                                              <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                                                {new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(detail.service.price)}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <span className="flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full bg-white border border-slate-200 text-slate-500">
+                                            {detail.hotel ? "Khách sạn" : detail.restaurant ? "Nhà hàng" : "Dịch vụ"}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               );
                             })}
                           </div>
                         ) : (
-                          <div className="text-center py-6 text-slate-400 text-sm">Chưa có thông tin kịch bản chi tiết cho ngày này.</div>
+                          <div className="text-center py-10 text-slate-300">
+                            <span className="text-4xl block mb-2">📋</span>
+                            <p className="text-sm font-medium">Chưa có thông tin chi tiết cho ngày này.</p>
+                          </div>
                         )}
                       </div>
                     );

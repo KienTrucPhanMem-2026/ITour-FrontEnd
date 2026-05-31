@@ -60,3 +60,16 @@ export async function updateBookingPassengersAPI(
   const res = await axiosClient.put<any>(`/bookings/${bookingId}/passengers`, passengers);
   return res.data;
 }
+
+/**
+ * POST /api/payment/momo/create?bookingId={bookingId}
+ * Khởi tạo liên kết thanh toán MoMo cho booking
+ */
+export async function createMomoPaymentAPI(
+  bookingId: string
+): Promise<any> {
+  return apiFetch<any>(`/payment/momo/create?bookingId=${bookingId}`, {
+    method: "POST",
+  });
+}
+

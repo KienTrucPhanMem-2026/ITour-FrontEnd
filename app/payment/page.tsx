@@ -25,6 +25,16 @@ function formatDate(d?: string): string {
   return new Date(d).toLocaleDateString("vi-VN");
 }
 
+function makeSlug(tourName: string): string {
+  return (tourName ?? "tour")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 // ─────────────────────────────────────────────────────────────
 function PaymentContent() {
   const router = useRouter();
@@ -291,7 +301,7 @@ function PaymentContent() {
               Giao dịch giữ chỗ đã quá hạn 15 phút và bị tự động hủy. Vui lòng đặt lại tour.
             </p>
             <Link
-              href={`/tours/${pendingBooking.tourId}`}
+              href={`/tours/${makeSlug(tour?.name || "tour")}?id=${pendingBooking.tourId}`}
               className="block w-full py-3 bg-[#0EA5E9] hover:bg-[#0284C7] text-white font-bold rounded-xl text-center transition-colors shadow-md hover:shadow-lg"
             >
               Đặt lại tour
