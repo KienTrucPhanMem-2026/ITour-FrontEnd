@@ -19,6 +19,16 @@ import {
   X, ChevronDown, Info,
 } from "lucide-react";
 
+function makeSlug(tourName: string): string {
+  return (tourName ?? "tour")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 // ─────────────────────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────────────────────
@@ -804,7 +814,7 @@ export default function BookingDetailPage() {
                   <div className="mt-5 pt-3 border-t border-rose-100/30">
                     {tour && (
                       <Link
-                        href={`/tours/${tour.id}`}
+                        href={`/tours/${makeSlug(tour.name)}?id=${tour.id}`}
                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-black rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-95 border border-rose-100/30"
                       >
                         <Info className="w-3.5 h-3.5 fill-rose-600 text-rose-50 shrink-0" />
@@ -896,7 +906,7 @@ export default function BookingDetailPage() {
 
                     {tour && (
                       <Link
-                        href={`/tours/${tour.id}`}
+                        href={`/tours/${makeSlug(tour.name)}?id=${tour.id}`}
                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 font-black rounded-2xl text-xs uppercase tracking-wider transition-all active:scale-95 border border-indigo-100/30"
                       >
                         <Info className="w-3.5 h-3.5 fill-indigo-600 text-indigo-50 shrink-0" />
