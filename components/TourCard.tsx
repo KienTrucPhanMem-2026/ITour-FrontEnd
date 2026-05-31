@@ -1,6 +1,9 @@
 import { TourDTO } from "@/types/api";
-import Link from "next/link";
-import { MapPin, Clock, Car, Users, Star } from "lucide-react";
+import { MapPin, Clock, Car, Users, Star, Heart } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { getStoredUser } from "@/lib/auth";
+import { addFavouriteAPI, removeFavouriteAPI, checkIsFavouriteAPI } from "@/lib/api/favourites";
 
 function makeSlug(tour: TourDTO): string {
   const namePart = (tour.name ?? "tour")
@@ -13,12 +16,13 @@ function makeSlug(tour: TourDTO): string {
   return namePart;
 }
 
-function formatPrice(price?: number): string {
+function formatFullPrice(price?: number): string {
   if (!price) return "Liên hệ";
-  // Nếu chẵn triệu thì hiển thị 6Mđ, lẻ thì 6.5Mđ
-  const millions = price / 1_000_000;
-  const formatted = millions % 1 === 0 ? millions.toFixed(0) : millions.toFixed(1);
-  return `${formatted}Mđ`;
+  return new Intl.NumberFormat("vi-VN", {
+    style: "currency",
+    currency: "VND",
+    maximumFractionDigits: 0,
+  }).format(price);
 }
 
 const TOUR_TYPE_LABELS: Record<string, string> = {
@@ -41,22 +45,68 @@ const VEHICLE_LABELS: Record<string, string> = {
 };
 
 export default function TourCard({ tour }: { tour: TourDTO }) {
+  const router = useRouter();
+  const [isFavorite, setIsFavorite] = useState(false);
   const slug = makeSlug(tour);
   const typeLabel = TOUR_TYPE_LABELS[tour.tourType ?? ""] ?? tour.tourType ?? "Du lịch";
   const vehicleLabel = VEHICLE_LABELS[tour.vehicleType ?? ""] ?? tour.vehicleType ?? "Ô tô";
 
   // Sử dụng ảnh đầu tiên hoặc ảnh mẫu chất lượng cao
-  const mainImage = tour.images && tour.images.length > 0 
-    ? tour.images[0] 
+  const mainImage = tour.images && tour.images.length > 0
+    ? tour.images[0]
     : "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=1000";
 
+  const promoPrice = tour.price;
+  const originalPrice = promoPrice ? Math.round((promoPrice * 1.15) / 100000) * 100000 : undefined;
+
+  useEffect(() => {
+    const user = getStoredUser();
+    if (user && tour.id) {
+      checkIsFavouriteAPI(user.id, tour.id)
+        .then((res) => setIsFavorite(res))
+        .catch((err) => console.error("Error checking favorite status:", err));
+    }
+  }, [tour.id]);
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.nativeEvent as any)._isFavoriteClick = true;
+
+    const user = getStoredUser();
+    if (!user) {
+      alert("Vui lòng đăng nhập để lưu tour yêu thích!");
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        await removeFavouriteAPI(user.id, tour.id);
+        setIsFavorite(false);
+      } else {
+        await addFavouriteAPI(user.id, tour.id);
+        setIsFavorite(true);
+      }
+    } catch (err) {
+      console.error("Error toggling favorite:", err);
+      alert("Đã xảy ra lỗi khi cập nhật danh sách yêu thích!");
+    }
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.nativeEvent as any)._isFavoriteClick || (e.target as HTMLElement).closest(".favorite-btn")) {
+      return;
+    }
+    router.push(`/tours/${slug}?id=${tour.id}`);
+  };
+
   return (
-    <Link href={`/tours/${slug}?id=${tour.id}`} className="group block focus:outline-none focus:ring-4 focus:ring-sky-500/40 rounded-[2.2rem] transition-all">
+    <div onClick={handleCardClick} className="group block focus:outline-none focus:ring-4 focus:ring-sky-500/40 rounded-[2.2rem] transition-all cursor-pointer">
       <div className="relative h-[480px] w-full rounded-[2.2rem] overflow-hidden shadow-md group-hover:shadow-2xl transition-all duration-500 border border-slate-100/10">
-        
+
         {/* Background Image */}
-        <img 
-          src={mainImage} 
+        <img
+          src={mainImage}
           alt={tour.name}
           className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out z-0"
         />
@@ -65,23 +115,34 @@ export default function TourCard({ tour }: { tour: TourDTO }) {
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/40 to-transparent z-10" />
 
         {/* Top Badges */}
-        <div className="absolute top-4 left-4 z-20 flex gap-2">
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
           <span className="bg-slate-900/60 backdrop-blur-md text-white border border-white/10 text-[10px] font-bold tracking-wider px-3 py-1 rounded-full uppercase">
             {typeLabel}
           </span>
+          {tour.rating && (
+            <span className="bg-slate-900/60 backdrop-blur-md text-white border border-white/10 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center gap-1 shadow-sm">
+              <Star className="w-3 h-3 fill-amber-400 text-amber-400" /> {tour.rating.toFixed(1)}
+            </span>
+          )}
         </div>
 
-        {tour.rating && (
-          <div className="absolute top-4 right-4 z-20">
-            <span className="bg-slate-900/60 backdrop-blur-md text-white border border-white/10 text-[10px] font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-sm">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" /> {tour.rating.toFixed(1)}
-            </span>
-          </div>
-        )}
+        {/* Favorite Button */}
+        <button
+          onClick={handleFavoriteClick}
+          className="favorite-btn absolute top-4 right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/20 transition-all duration-300 active:scale-90 shadow-sm"
+        >
+          <Heart
+            className={`w-5 h-5 transition-all duration-300 ${
+              isFavorite
+                ? "fill-rose-500 text-rose-500 scale-110"
+                : "text-white hover:scale-105"
+            }`}
+          />
+        </button>
 
         {/* Content Section Overlay */}
         <div className="absolute inset-0 flex flex-col justify-end p-6 z-20">
-          
+
           {/* Dot Indicators (Mock carousel style from photo) */}
           <div className="flex justify-center gap-1.5 mb-4">
             <span className="w-2 h-2 rounded-full bg-white" />
@@ -108,18 +169,21 @@ export default function TourCard({ tour }: { tour: TourDTO }) {
           <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-white py-3 border-t border-b border-white/10 mb-5">
             <span className="flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 fill-sky-400 text-sky-400" /> {tour.durationDays}N{tour.durationNights ? `${tour.durationNights}Đ` : ""}</span>
             <span className="text-white/20">|</span>
-            <span className="flex items-center gap-1.5"><Car className="w-3.5 h-3.5 fill-emerald-400 text-emerald-400" /> {vehicleLabel}</span>
-            <span className="text-white/20">|</span>
             <span className="flex items-center gap-1.5"><Users className="w-3.5 h-3.5 fill-purple-400 text-purple-400" /> Còn {tour.availableSlots ?? 10} chỗ</span>
           </div>
 
           {/* Price + Button Row */}
-          <div className="flex items-center gap-3">
-            
-            {/* Price Pill */}
-            <div className="bg-[#2d3a2d]/65 border border-white/15 backdrop-blur-md px-5 py-2.5 rounded-full text-center min-w-[85px] shadow-sm">
-              <span className="text-base font-black text-white tracking-tight">
-                {formatPrice(tour.price)}
+          <div className="flex items-center justify-between gap-3">
+
+            {/* Price Text Block */}
+            <div className="flex flex-col justify-center text-left">
+              {originalPrice && (
+                <span className="text-[11px] text-white/50 line-through tracking-tight">
+                  {formatFullPrice(originalPrice)}
+                </span>
+              )}
+              <span className="text-lg md:text-xl font-black text-emerald-400 tracking-tight leading-tight">
+                {formatFullPrice(promoPrice)}
               </span>
             </div>
 
@@ -133,6 +197,6 @@ export default function TourCard({ tour }: { tour: TourDTO }) {
         </div>
 
       </div>
-    </Link>
+    </div>
   );
 }

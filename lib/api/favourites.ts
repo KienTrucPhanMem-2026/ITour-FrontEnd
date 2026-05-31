@@ -18,7 +18,7 @@ export async function getFavouriteToursAPI(customerId: string): Promise<TourDTO[
 export async function addFavouriteAPI(customerId: string, tourId: string): Promise<any> {
   const res = await axiosClient.post<any>(`/favourites`, {
     id: `fav-${Date.now()}`,
-    customer: { id: customerId },
+    customer: { id: customerId, user_type: "CUSTOMER" },
     tour: { id: tourId },
   });
   return res.data;

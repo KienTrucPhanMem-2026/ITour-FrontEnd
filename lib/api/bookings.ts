@@ -68,8 +68,7 @@ export async function updateBookingPassengersAPI(
 export async function createMomoPaymentAPI(
   bookingId: string
 ): Promise<any> {
-  return apiFetch<any>(`/payment/momo/create?bookingId=${bookingId}`, {
-    method: "POST",
-  });
+  const res = await axiosClient.post<any>(`/payment/momo/create?bookingId=${bookingId}`);
+  return res.data;
 }
 
