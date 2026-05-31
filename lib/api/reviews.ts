@@ -1,4 +1,7 @@
-import { API_BASE_URL } from "./config";
+// ============================================================
+// Reviews API
+// ============================================================
+import axiosClient from "./axiosClient";
 
 export interface ReviewDTO {
   id?: string;
@@ -8,8 +11,8 @@ export interface ReviewDTO {
   tourId?: string;
   tourGuideId?: string;
   tourGuideName?: string;
-  rating?: number;        // backward compatibility
-  comment?: string;       // backward compatibility
+  rating?: number;
+  comment?: string;
   tourRating?: number;
   tourComment?: string;
   guideRating?: number;
@@ -20,48 +23,26 @@ export interface ReviewDTO {
   active?: boolean;
 }
 
-export const getReviewsByTourAPI = async (
-  tourId: string
-): Promise<ReviewDTO[]> => {
-  const response = await fetch(`${API_BASE_URL}/reviews/tour/${tourId}/latest`);
-  if (!response.ok) throw new Error("Failed to fetch reviews");
-  return response.json();
+export const getReviewsByTourAPI = async (tourId: string): Promise<ReviewDTO[]> => {
+  const res = await axiosClient.get<ReviewDTO[]>(`/reviews/tour/${tourId}/latest`);
+  return res.data;
 };
 
-export const getReviewByBookingAPI = async (
-  bookingId: string
-): Promise<ReviewDTO> => {
-  const response = await fetch(`${API_BASE_URL}/reviews/booking/${bookingId}`);
-  if (!response.ok) throw new Error("Failed to fetch review for this booking");
-  return response.json();
+export const getReviewByBookingAPI = async (bookingId: string): Promise<ReviewDTO> => {
+  const res = await axiosClient.get<ReviewDTO>(`/reviews/booking/${bookingId}`);
+  return res.data;
 };
 
 export const createReviewAPI = async (review: ReviewDTO): Promise<ReviewDTO> => {
-  const response = await fetch(`${API_BASE_URL}/reviews`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(review),
-  });
-  if (!response.ok) throw new Error("Failed to create review");
-  return response.json();
+  const res = await axiosClient.post<ReviewDTO>("/reviews", review);
+  return res.data;
 };
 
-export const updateReviewAPI = async (
-  id: string,
-  review: ReviewDTO
-): Promise<ReviewDTO> => {
-  const response = await fetch(`${API_BASE_URL}/reviews/${id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(review),
-  });
-  if (!response.ok) throw new Error("Failed to update review");
-  return response.json();
+export const updateReviewAPI = async (id: string, review: ReviewDTO): Promise<ReviewDTO> => {
+  const res = await axiosClient.put<ReviewDTO>(`/reviews/${id}`, review);
+  return res.data;
 };
 
 export const deleteReviewAPI = async (id: string): Promise<void> => {
-  const response = await fetch(`${API_BASE_URL}/reviews/${id}`, {
-    method: "DELETE",
-  });
-  if (!response.ok) throw new Error("Failed to delete review");
+  await axiosClient.delete(`/reviews/${id}`);
 };
