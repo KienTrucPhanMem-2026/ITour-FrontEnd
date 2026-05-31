@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Header from "@/components/Header";
@@ -16,10 +16,11 @@ import {
   User as UserIcon, Calendar, Heart, Ticket, Eye, Clock, Phone, Award,
   ShieldAlert, Sparkles, CheckCircle, Trash2, ShieldCheck, Zap
 } from "lucide-react";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 type TabType = "info" | "bookings" | "schedules" | "vouchers" | "favourites";
 
-export default function ProfilePage() {
+function ProfilePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>("info");
@@ -133,6 +134,9 @@ export default function ProfilePage() {
   const [bookingToCancel, setBookingToCancel] = useState<any | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!profile) return;
@@ -157,30 +161,33 @@ export default function ProfilePage() {
     setCancelModalOpen(true);
   };
 
-  const confirmCancelBooking = async () => {
-    if (!bookingIdToCancel) return;
-    setIsCancelling(true);
-    try {
-      await cancelBookingAPI(bookingIdToCancel);
-      // Reload bookings list
-      if (profile) {
-        const bData = await getMyBookingsAPI(profile.id);
-        const sorted = (bData || []).sort((a: any, b: any) => {
-          return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
-        });
-        setBookings(sorted);
-        // reload profile to update points if reversed
-        const pData = await getUserProfileAPI(profile.id);
-        setProfile(pData);
+  const confirmCancelBooking = () => {
+    if (!bookingIdToCancel || isBlocked) return;
+    
+    throttledSubmit(async () => {
+      setIsCancelling(true);
+      try {
+        await cancelBookingAPI(bookingIdToCancel);
+        // Reload bookings list
+        if (profile) {
+          const bData = await getMyBookingsAPI(profile.id);
+          const sorted = (bData || []).sort((a: any, b: any) => {
+            return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
+          });
+          setBookings(sorted);
+          // reload profile to update points if reversed
+          const pData = await getUserProfileAPI(profile.id);
+          setProfile(pData);
+        }
+      } catch (err: any) {
+        alert(err.message || "Không thể hủy đơn này.");
+      } finally {
+        setIsCancelling(false);
+        setCancelModalOpen(false);
+        setBookingIdToCancel(null);
+        setBookingToCancel(null);
       }
-    } catch (err: any) {
-      alert(err.message || "Không thể hủy đơn này.");
-    } finally {
-      setIsCancelling(false);
-      setCancelModalOpen(false);
-      setBookingIdToCancel(null);
-      setBookingToCancel(null);
-    }
+    });
   };
 
   const handleRemoveFav = async (tourId: string) => {
@@ -987,7 +994,7 @@ export default function ProfilePage() {
                 {!cannotCancel && (
                   <button
                     onClick={confirmCancelBooking}
-                    disabled={isCancelling}
+                    disabled={isCancelling || isBlocked}
                     className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.98] shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
                   >
                     {isCancelling ? (
@@ -1003,5 +1010,17 @@ export default function ProfilePage() {
         );
       })()}
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600" />
+      </div>
+    }>
+      <ProfilePageContent />
+    </Suspense>
   );
 }

@@ -1,78 +1,53 @@
 // ============================================================
 // Bookings API
 // ============================================================
-import { apiFetch } from "./config";
+import axiosClient from "./axiosClient";
 import type { ApiResponse, BookingRequestDTO, BookingResponseDTO } from "@/types/api";
 
 /**
  * GET /api/bookings/customer/{customerId} — Lấy danh sách bookings của user
- * Yêu cầu cookie JWT hợp lệ
  */
-export async function getMyBookingsAPI(
-  customerId: string
-): Promise<BookingResponseDTO[]> {
-  const res = await apiFetch<ApiResponse<BookingResponseDTO[]>>(
-    `/bookings/customer/${customerId}`,
-    {
-      method: "GET",
-    }
+export async function getMyBookingsAPI(customerId: string): Promise<BookingResponseDTO[]> {
+  const res = await axiosClient.get<ApiResponse<BookingResponseDTO[]>>(
+    `/bookings/customer/${customerId}`
   );
-  return res.data || [];
+  return res.data.data || [];
 }
 
 /**
  * POST /api/bookings — Tạo booking mới
- * Yêu cầu cookie JWT hợp lệ (tự gửi qua credentials:include).
  */
-export async function createBookingAPI(
-  dto: BookingRequestDTO
-): Promise<BookingResponseDTO> {
-  const res = await apiFetch<ApiResponse<BookingResponseDTO>>("/bookings", {
-    method: "POST",
-    body: JSON.stringify(dto),
-  });
-  return res.data;
+export async function createBookingAPI(dto: BookingRequestDTO): Promise<BookingResponseDTO> {
+  const res = await axiosClient.post<ApiResponse<BookingResponseDTO>>("/bookings", dto);
+  return res.data.data;
 }
 
 /**
  * POST /api/bookings/{id}/cancel — Hủy booking
  */
-export async function cancelBookingAPI(
-  bookingId: string
-): Promise<BookingResponseDTO> {
-  const res = await apiFetch<ApiResponse<BookingResponseDTO>>(
-    `/bookings/${bookingId}/cancel`,
-    {
-      method: "POST",
-    }
+export async function cancelBookingAPI(bookingId: string): Promise<BookingResponseDTO> {
+  const res = await axiosClient.post<ApiResponse<BookingResponseDTO>>(
+    `/bookings/${bookingId}/cancel`
   );
-  return res.data;
+  return res.data.data;
 }
 
 /**
  * GET /api/bookings/{id}/payment-url
- * Lấy payment URL của booking (có thể null nếu consumer chưa xử lý xong).
- * Frontend nên poll API này mỗi 2 giây cho đến khi có URL.
  */
-export async function getBookingPaymentUrlAPI(
-  bookingId: string
-): Promise<BookingResponseDTO> {
-  const res = await apiFetch<ApiResponse<BookingResponseDTO>>(
-    `/bookings/${bookingId}/payment-url`,
-    { method: "GET" }
+export async function getBookingPaymentUrlAPI(bookingId: string): Promise<BookingResponseDTO> {
+  const res = await axiosClient.get<ApiResponse<BookingResponseDTO>>(
+    `/bookings/${bookingId}/payment-url`
   );
-  return res.data;
+  return res.data.data;
 }
 
 /**
  * GET /api/bookings/{id} — Lấy chi tiết booking theo ID
  */
-export async function getBookingByIdAPI(
-  bookingId: string
-): Promise<any> {
-  return apiFetch<any>(`/bookings/${bookingId}`, {
-    method: "GET",
-  });
+export async function getBookingByIdAPI(bookingId: string): Promise<any> {
+  const res = await axiosClient.get<any>(`/bookings/${bookingId}`);
+  return res.data;
 }
 
 /**
@@ -82,10 +57,8 @@ export async function updateBookingPassengersAPI(
   bookingId: string,
   passengers: any[]
 ): Promise<any> {
-  return apiFetch<any>(`/bookings/${bookingId}/passengers`, {
-    method: "PUT",
-    body: JSON.stringify(passengers),
-  });
+  const res = await axiosClient.put<any>(`/bookings/${bookingId}/passengers`, passengers);
+  return res.data;
 }
 
 /**

@@ -9,6 +9,7 @@ import { getUserVouchersAPI } from "@/lib/api/users";
 import { useCurrentUser } from "@/hooks/useAuth";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 import { useBookingTimer } from "@/hooks/useBookingTimer";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 import { ApiError } from "@/lib/api/config";
 import type { TourDTO, TourScheduleDTO, PaymentMethod, BookingResponseDTO } from "@/types/api";
 import Header from "@/components/Header";
@@ -52,6 +53,9 @@ function PaymentContent() {
   const [loading, setLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("MOMO");
+
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
 
   // ── Discount & Voucher state ──
   const [tourDiscounts, setTourDiscounts] = useState<any[]>([]);
@@ -231,13 +235,16 @@ function PaymentContent() {
     if (paymentUrl) window.location.href = paymentUrl;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setApiError(null);
-    if (!validate()) return;
-    if (!currentUser || !tour || !scheduleId) return;
+    if (isBlocked) return;
 
-    setLoading(true);
+    throttledSubmit(async () => {
+      setApiError(null);
+      if (!validate()) return;
+      if (!currentUser || !tour || !scheduleId) return;
+
+      setLoading(true);
     try {
       const bookingRequest: any = {
         customerId: currentUser.id,
@@ -268,9 +275,10 @@ function PaymentContent() {
         setApiError("Đặt tour thất bại. Vui lòng thử lại.");
       }
       console.error("Booking error:", err);
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   if (!isReady || loadingData || !tour) {
@@ -438,7 +446,7 @@ function PaymentContent() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || isBlocked}
                 className="w-full py-4 bg-[#00D084] hover:bg-[#00B86F] text-white font-bold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg shadow-lg hover:shadow-xl active:scale-[0.99] transition-all"
               >
                 {loading ? (

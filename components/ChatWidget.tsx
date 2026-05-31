@@ -5,6 +5,7 @@ import socket from "@/lib/socket";
 import { apiFetch, API_BASE_URL } from "@/lib/api/config";
 import { MessageBubble } from "./ChatCards";
 import { Bot, MessageSquare, Headphones, Lightbulb, Flame, Smile, Gift, Handshake, Check, Star } from "lucide-react";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 // --- Types ---
 interface ChatCustomerProfile {
@@ -65,6 +66,15 @@ export default function ChatWidget({
   const [showPreChatForm, setShowPreChatForm] = useState(true);
   const [loading, setLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+
+  // --- Resize States ---
+  const [chatWidth, setChatWidth] = useState(380);
+  const isResizingRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(380);
+
+  const MIN_CHAT_WIDTH = 320;
+  const MAX_CHAT_WIDTH = 800;
   
   // --- Rating States ---
   const [rating, setRating] = useState<number | null>(null);
@@ -110,6 +120,11 @@ export default function ChatWidget({
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const aiEventSourceRef = useRef<EventSource | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // --- Rate Limiting: Throttled Actions ---
+  const { execute: throttledExecAi, isBlocked: aiBlocked } = useThrottledAction(2000);
+  const { execute: throttledExecStaff, isBlocked: staffBlocked } = useThrottledAction(500);
 
   // Scroll to bottom helper
   const scrollToBottom = () => {
@@ -273,6 +288,42 @@ export default function ChatWidget({
       }
     };
   }, []);
+
+  // --- Horizontal Resize Handlers ---
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      e.preventDefault();
+      // Since widget is anchored to the right, dragging left increases width
+      const delta = startXRef.current - e.clientX;
+      const newWidth = Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, startWidthRef.current + delta));
+      setChatWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingRef.current) {
+        isResizingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = chatWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
 
 
   // --- Socket.io Listeners ---
@@ -631,7 +682,16 @@ export default function ChatWidget({
     aiEventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
-      const token = event.data;
+      let token = event.data;
+      try {
+        const parsed = JSON.parse(event.data);
+        if (parsed && typeof parsed.token === "string") {
+          token = parsed.token;
+        }
+      } catch (e) {
+        // Fallback to raw data if not JSON
+      }
+      
       setAiMessages((prev) =>
         prev.map((msg) =>
           msg.id === aiMsgId ? { ...msg, content: msg.content + token } : msg
@@ -808,7 +868,19 @@ export default function ChatWidget({
 
       {/* Main Chat Box Container */}
       {isOpen && (
-        <div className="w-[380px] h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300">
+        <div
+          ref={chatContainerRef}
+          style={{ width: `${chatWidth}px` }}
+          className="h-[600px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-6 duration-300 relative"
+        >
+          {/* Left Resize Handle */}
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute left-0 top-0 bottom-0 w-2 cursor-col-resize z-50 group hover:bg-sky-400/20 transition-colors"
+            title="Kéo để thay đổi kích thước"
+          >
+            <div className="absolute left-0.5 top-1/2 -translate-y-1/2 w-1 h-10 rounded-full bg-gray-300 group-hover:bg-sky-500 transition-colors" />
+          </div>
           {/* Header */}
           <div className="px-5 py-4 flex items-center justify-between shadow-sm text-white bg-gradient-to-r from-[#0EA5E9] to-[#0284C7] shrink-0">
             <div className="flex items-center gap-3">
@@ -942,20 +1014,23 @@ export default function ChatWidget({
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       <button
-                        onClick={() => handleSendAiMessage("Tour nào hot nhất?")}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        onClick={() => throttledExecAi(() => handleSendAiMessage("Tour nào hot nhất?"))}
+                        disabled={aiBlocked}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Flame className="w-3.5 h-3.5 text-orange-500 fill-orange-500/10" /> Tour nào hot nhất?
                       </button>
                       <button
-                        onClick={() => handleSendAiMessage("Giá vé trẻ em thế nào?")}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        onClick={() => throttledExecAi(() => handleSendAiMessage("Giá vé trẻ em thế nào?"))}
+                        disabled={aiBlocked}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Smile className="w-3.5 h-3.5 text-blue-500 fill-blue-500/10" /> Giá vé trẻ em thế nào?
                       </button>
                       <button
-                        onClick={() => handleSendAiMessage("Có chương trình ưu đãi gì không?")}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        onClick={() => throttledExecAi(() => handleSendAiMessage("Có chương trình ưu đãi gì không?"))}
+                        disabled={aiBlocked}
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-semibold rounded-lg transition-all active:scale-95 border border-slate-200 shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Gift className="w-3.5 h-3.5 text-pink-500 fill-pink-500/10" /> Có chương trình ưu đãi gì không?
                       </button>
@@ -1204,13 +1279,14 @@ export default function ChatWidget({
                 value={aiInputValue}
                 onChange={(e) => setAiInputValue(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSendAiMessage();
+                  if (e.key === "Enter" && !aiBlocked) throttledExecAi(() => handleSendAiMessage());
                 }}
                 className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent transition-all"
               />
               <button
-                onClick={() => handleSendAiMessage()}
-                className="w-8 h-8 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all cursor-pointer shrink-0"
+                onClick={() => throttledExecAi(() => handleSendAiMessage())}
+                disabled={aiBlocked || !aiInputValue.trim()}
+                className="w-8 h-8 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 <svg className="w-4 h-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -1227,13 +1303,14 @@ export default function ChatWidget({
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSendMessage();
+                    if (e.key === "Enter" && !staffBlocked) throttledExecStaff(() => handleSendMessage());
                   }}
                   className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#0EA5E9] focus:border-transparent transition-all"
                 />
                 <button
-                  onClick={handleSendMessage}
-                  className="w-8 h-8 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all cursor-pointer shrink-0"
+                  onClick={() => throttledExecStaff(() => handleSendMessage())}
+                  disabled={staffBlocked || !inputValue.trim()}
+                  className="w-8 h-8 rounded-xl bg-[#0EA5E9] hover:bg-[#0284C7] text-white flex items-center justify-center shadow-md hover:scale-105 transition-all cursor-pointer shrink-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
                   <svg className="w-4 h-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

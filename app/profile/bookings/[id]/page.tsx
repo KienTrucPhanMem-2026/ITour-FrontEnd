@@ -18,6 +18,7 @@ import {
   User, ShieldCheck, Mail, Phone, CheckCircle2, XCircle,
   X, ChevronDown, Info,
 } from "lucide-react";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 function makeSlug(tourName: string): string {
   return (tourName ?? "tour")
@@ -452,6 +453,9 @@ export default function BookingDetailPage() {
   const [passengerForm, setPassengerForm] = useState<PassengerFormItem[]>([]);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
+
   const [paying, setPaying] = useState(false);
 
   const handleMomoPayment = async () => {
@@ -651,20 +655,23 @@ export default function BookingDetailPage() {
   };
 
   // ── cancel ──
-  const confirmCancel = async () => {
-    if (!booking) return;
-    setIsCancelling(true);
-    try {
-      await cancelBookingAPI(booking.id);
-      const user = getStoredUser();
-      if (user) await loadDetails(booking.id, user.id);
-      showToast("Hủy đặt tour thành công.", "success");
-    } catch (err: any) {
-      showToast(err.message || "Không thể hủy đơn hàng.", "error");
-    } finally {
-      setIsCancelling(false);
-      setCancelModalOpen(false);
-    }
+  const confirmCancel = () => {
+    if (!booking || isBlocked) return;
+
+    throttledSubmit(async () => {
+      setIsCancelling(true);
+      try {
+        await cancelBookingAPI(booking.id);
+        const user = getStoredUser();
+        if (user) await loadDetails(booking.id, user.id);
+        showToast("Hủy đặt tour thành công.", "success");
+      } catch (err: any) {
+        showToast(err.message || "Không thể hủy đơn hàng.", "error");
+      } finally {
+        setIsCancelling(false);
+        setCancelModalOpen(false);
+      }
+    });
   };
 
   const formatPrice = (price?: number) =>
@@ -1563,7 +1570,7 @@ export default function BookingDetailPage() {
                 {!cannotCancel && (
                   <button
                     onClick={confirmCancel}
-                    disabled={isCancelling}
+                    disabled={isCancelling || isBlocked}
                     className="flex-1 py-3 bg-rose-500 hover:bg-rose-600 disabled:bg-rose-300 text-white font-bold rounded-xl text-xs transition-all active:scale-[0.98] shadow-md shadow-rose-100 flex items-center justify-center gap-1.5"
                   >
                     {isCancelling ? (

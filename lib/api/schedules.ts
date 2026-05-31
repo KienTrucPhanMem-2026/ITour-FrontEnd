@@ -1,19 +1,21 @@
 // ============================================================
 // Tour Schedules API
 // ============================================================
-import { apiFetch } from "./config";
+import axiosClient from "./axiosClient";
 import type { TourScheduleDTO } from "@/types/api";
 
 /**
- * GET /api/tour-schedules/tour/{tourId} — Lấy danh sách schedule theo tourId
+ * GET /api/tour-schedules/tour/{tourId}
  */
 export async function getSchedulesByTourIdAPI(tourId: string): Promise<TourScheduleDTO[]> {
-  return apiFetch<TourScheduleDTO[]>(`/tour-schedules/tour/${tourId}`);
+  const res = await axiosClient.get<TourScheduleDTO[]>(`/tour-schedules/tour/${tourId}`);
+  return res.data;
 }
 
 /**
- * GET /api/tour-schedules/active — Lấy danh sách schedule đang active
+ * GET /api/tour-schedules/active
  */
 export async function getActiveSchedulesAPI(): Promise<TourScheduleDTO[]> {
-  return apiFetch<TourScheduleDTO[]>("/tour-schedules/active");
+  const res = await axiosClient.get<TourScheduleDTO[]>("/tour-schedules/active");
+  return res.data;
 }

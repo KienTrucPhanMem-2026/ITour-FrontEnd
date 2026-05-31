@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getTourByIdAPI, getTourItinerariesAPI } from "@/lib/api/tours";
@@ -10,6 +10,7 @@ import ReviewList from "@/components/ReviewList";
 import ReviewForm from "@/components/ReviewForm";
 import type { TourDTO, UserProfile } from "@/types/api";
 import Header from "@/components/Header";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 interface Venue {
   id: string;
@@ -104,7 +105,7 @@ function formatDate(dateStr?: string): string {
   });
 }
 
-export default function TourDetailPage() {
+function TourDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tourId = searchParams.get("id") || "";
@@ -122,6 +123,9 @@ export default function TourDetailPage() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [showGuestPopover, setShowGuestPopover] = useState(false);
   const guestPopoverRef = useRef<HTMLDivElement>(null);
+
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -293,30 +297,33 @@ export default function TourDetailPage() {
     };
   }, [isPrivate, tour, adults, children]);
 
-  const handlePrivateBooking = async () => {
-    const currentUser = getStoredUser();
-    if (!currentUser) {
-      const currentUrl = window.location.pathname + window.location.search;
-      router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
-      return;
-    }
+  const handlePrivateBooking = () => {
+    if (isBlocked) return;
 
-    if (!departureDate) {
-      showToast("Vui lòng chọn ngày khởi hành!", "error");
-      return;
-    }
+    throttledSubmit(async () => {
+      const currentUser = getStoredUser();
+      if (!currentUser) {
+        const currentUrl = window.location.pathname + window.location.search;
+        router.push(`/login?redirect=${encodeURIComponent(currentUrl)}`);
+        return;
+      }
 
-    if (!privatePricing || !privatePricing.matched) {
-      showToast("Số lượng khách không phù hợp với các khung giá tour riêng. Vui lòng thay đổi số lượng khách!", "error");
-      return;
-    }
+      if (!departureDate) {
+        showToast("Vui lòng chọn ngày khởi hành!", "error");
+        return;
+      }
 
-    // Lấy template schedule đầu tiên của tour
-    const baseScheduleId = tour?.schedules?.[0]?.id;
-    if (!baseScheduleId) {
-      showToast("Hệ thống chưa thiết lập lịch trình mẫu cho tour này. Vui lòng quay lại sau!", "error");
-      return;
-    }
+      if (!privatePricing || !privatePricing.matched) {
+        showToast("Số lượng khách không phù hợp với các khung giá tour riêng. Vui lòng thay đổi số lượng khách!", "error");
+        return;
+      }
+
+      // Lấy template schedule đầu tiên của tour
+      const baseScheduleId = tour?.schedules?.[0]?.id;
+      if (!baseScheduleId) {
+        showToast("Hệ thống chưa thiết lập lịch trình mẫu cho tour này. Vui lòng quay lại sau!", "error");
+        return;
+      }
 
     try {
       setSubmittingBooking(true);
@@ -340,12 +347,13 @@ export default function TourDetailPage() {
       setTimeout(() => {
         router.push("/profile");
       }, 3000);
-    } catch (err: any) {
-      console.error("Lỗi đặt tour riêng:", err);
-      showToast(err.message || "Có lỗi xảy ra khi gửi yêu cầu đặt tour. Vui lòng thử lại!", "error");
-    } finally {
-      setSubmittingBooking(false);
-    }
+      } catch (err: any) {
+        console.error("Lỗi đặt tour riêng:", err);
+        showToast(err.message || "Có lỗi xảy ra khi gửi yêu cầu đặt tour. Vui lòng thử lại!", "error");
+      } finally {
+        setSubmittingBooking(false);
+      }
+    });
   };
 
   const tourBookings = useMemo(() => {
@@ -866,7 +874,7 @@ export default function TourDetailPage() {
                   {/* CTA Button */}
                   <button
                     onClick={handlePrivateBooking}
-                    disabled={submittingBooking || !privatePricing?.matched}
+                    disabled={submittingBooking || !privatePricing?.matched || isBlocked}
                     className="w-full py-2.5 bg-sky-600 text-white font-bold rounded-xl hover:bg-sky-700 active:scale-[0.98] transition-all disabled:bg-slate-200 disabled:text-slate-400 shadow-xl shadow-sky-100/50 text-xs tracking-wide flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     {submittingBooking ? (
@@ -1005,5 +1013,15 @@ export default function TourDetailPage() {
       {/* Toast notifications */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
+  );
+}
+
+export default function TourDetailPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>
+    }>
+      <TourDetailContent />
+    </Suspense>
   );
 }

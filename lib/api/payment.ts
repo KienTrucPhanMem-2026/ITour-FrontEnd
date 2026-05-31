@@ -1,30 +1,24 @@
 // ============================================================
 // Payment API — MoMo Payment Gateway Integration
 // ============================================================
-import { apiFetch } from "./config";
+import axiosClient from "./axiosClient";
 import type { ApiResponse, MomoCreatePaymentResponse, BookingRequestDTO } from "@/types/api";
 
 /**
  * POST /api/checkout/momo — Create MoMo payment for booking
- * Creates booking + MoMo payment link in single request
- * Returns payUrl for redirect
  */
 export async function createMomoPaymentAPI(
   bookingRequest: BookingRequestDTO
 ): Promise<MomoCreatePaymentResponse> {
-  const res = await apiFetch<ApiResponse<MomoCreatePaymentResponse>>(
+  const res = await axiosClient.post<ApiResponse<MomoCreatePaymentResponse>>(
     "/checkout/momo",
-    {
-      method: "POST",
-      body: JSON.stringify(bookingRequest),
-    }
+    bookingRequest
   );
-  return res.data;
+  return res.data.data;
 }
 
 /**
- * GET /api/checkout/momo/return — MoMo redirect return (for reference)
- * User is redirected here after payment attempt
+ * GET /api/checkout/momo/return — MoMo redirect return URL (for reference)
  */
 export function getMomoReturnUrl(): string {
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "";

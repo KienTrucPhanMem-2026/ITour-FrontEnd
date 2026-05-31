@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { ReviewDTO } from "@/lib/api/reviews";
 import { createReviewAPI } from "@/lib/api/reviews";
+import { useThrottledAction } from "@/hooks/useThrottledAction";
 
 interface BookingInfo {
   bookingId: string;
@@ -36,6 +37,9 @@ export default function ReviewForm({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Rate Limiting hook
+  const { execute: throttledSubmit, isBlocked } = useThrottledAction(2000);
+
   // Auto-select the first booking on mount or list changes
   useEffect(() => {
     if (unreviewedBookings.length > 0) {
@@ -57,10 +61,13 @@ export default function ReviewForm({
 
   const selectedBooking = unreviewedBookings.find((b) => b.bookingId === selectedBookingId) || unreviewedBookings[0];
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setSuccess(false);
+    if (isBlocked) return;
+    
+    throttledSubmit(async () => {
+      setError(null);
+      setSuccess(false);
 
     if (!selectedBooking) {
       setError("Vui lòng chọn chuyến đi cần đánh giá.");
@@ -115,9 +122,10 @@ export default function ReviewForm({
       const errorMsg = err instanceof Error ? err.message : "Không thể gửi đánh giá";
       setError(errorMsg);
       onError?.(errorMsg);
-    } finally {
-      setLoading(false);
-    }
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
   const getGuideInitials = (name?: string) => {
@@ -281,7 +289,7 @@ export default function ReviewForm({
           {/* Submit */}
           <button
             type="submit"
-            disabled={loading || success}
+            disabled={loading || success || isBlocked}
             className="w-full py-3 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-extrabold rounded-xl transition-all duration-200 text-xs shadow-lg shadow-sky-100/50 active:scale-[0.98] cursor-pointer"
           >
             {loading ? "Đang xử lý..." : "Gửi Đánh Giá Chuyến Đi"}

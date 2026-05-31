@@ -10,7 +10,9 @@ import TourCard from "@/components/TourCard";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import SearchBar from "@/components/SearchBar";
+import type { SearchSuggestion } from "@/components/SearchBar";
 import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { isDomesticTour } from "@/lib/tourHelpers";
 
 const TOUR_TYPE_LABELS: Record<string, string> = {
@@ -81,7 +83,7 @@ function CollapsePanel({ title, isOpen, onToggle, children }: CollapsePanelProps
   );
 }
 
-export default function ToursPage() {
+function ToursPageContent() {
   const [allTours, setAllTours] = useState<TourDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,6 +119,54 @@ export default function ToursPage() {
   const [startDateTo, setStartDateTo] = useState<string>("");
   const [sortBy, setSortBy] = useState<"price-asc" | "price-desc" | "rating" | "available">("rating");
 
+  // Suggestions cho autocomplete search
+  const suggestions = useMemo<SearchSuggestion[]>(() => {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q || q.length < 2) return [];
+
+    const results: SearchSuggestion[] = [];
+
+    // Nhóm điểm khởi hành khớp từ khóa
+    const destMap = new Map<string, number>();
+    allTours.forEach((t) => {
+      const dest = t.startDestinationName;
+      if (dest?.toLowerCase().includes(q)) {
+        destMap.set(dest, (destMap.get(dest) ?? 0) + 1);
+      }
+    });
+    destMap.forEach((count, label) => {
+      results.push({ type: "destination", label, count });
+    });
+
+    // Nhóm điểm đến khớp từ khóa (nếu khác điểm khởi hành)
+    const endMap = new Map<string, number>();
+    allTours.forEach((t) => {
+      const dest = t.endDestinationName;
+      if (dest?.toLowerCase().includes(q) && dest !== t.startDestinationName) {
+        endMap.set(dest, (endMap.get(dest) ?? 0) + 1);
+      }
+    });
+    endMap.forEach((count, label) => {
+      results.push({ type: "destination", label, count });
+    });
+
+    // Tên tour khớp từ khóa (tối đa 5)
+    allTours
+      .filter((t) => t.name?.toLowerCase().includes(q))
+      .slice(0, 5)
+      .forEach((t) => {
+        results.push({
+          type: "tour",
+          label: t.name ?? "",
+          sublabel: [t.startDestinationName, t.endDestinationName]
+            .filter(Boolean)
+            .join(" → "),
+        });
+      });
+
+    return results.slice(0, 10);
+  }, [allTours, searchTerm]);
+
   useEffect(() => {
     setCurrentUser(getStoredUser());
     fetchTours();
@@ -130,6 +180,12 @@ export default function ToursPage() {
       setSelectedGeo("international");
     } else {
       setSelectedGeo("all");
+    }
+
+    // Đọc từ khóa tìm kiếm được truyền từ Homepage
+    const qParam = searchParams.get("q");
+    if (qParam) {
+      setSearchTerm(qParam);
     }
   }, [searchParams]);
 
@@ -277,8 +333,12 @@ export default function ToursPage() {
             <div className="w-full max-w-2xl">
               <SearchBar
                 placeholder="Bạn muốn đến đâu hôm nay?"
-                onSearch={(value) => setSearchTerm(value)}
                 variant="glass"
+                initialValue={searchTerm}
+                onSearch={(value) => setSearchTerm(value)}
+                onQueryChange={(value) => setSearchTerm(value)}
+                onSelectSuggestion={(s) => setSearchTerm(s.label)}
+                suggestions={suggestions}
               />
             </div>
           </div>
@@ -552,5 +612,17 @@ export default function ToursPage() {
       {/* ── Footer ── */}
       <Footer></Footer>
     </div>
+  );
+}
+
+export default function ToursPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-[#F5F8F8]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sky-600" />
+      </div>
+    }>
+      <ToursPageContent />
+    </Suspense>
   );
 }

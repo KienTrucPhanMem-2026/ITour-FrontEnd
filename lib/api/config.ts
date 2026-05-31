@@ -2,10 +2,13 @@
 // API Client — Base config với credentials:include để gửi HttpOnly cookie
 // ============================================================
 
-import { log } from "console";
 
-export const API_BASE_URL = "http://localhost:8080/api";
+console.log("Production ", process.env.NEXT_PUBLIC_ENVIRONMENT);
 
+
+export const API_BASE_URL = process.env.NEXT_PUBLIC_ENVIRONMENT === "PRODUCTION"
+  ? "https://itours.duckdns.org/api"
+  : "http://localhost:8080/api";
 /** Lỗi từ API — chứa code, message */
 export class ApiError extends Error {
   constructor(
@@ -46,6 +49,11 @@ export async function apiFetch<T>(
       window.location.href = "/login";
     }
     throw new ApiError(401, "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại.");
+  }
+
+  // Xử lý 429 — Rate limited (gửi request quá nhanh)
+  if (res.status === 429) {
+    throw new ApiError(429, "Bạn đang gửi yêu cầu quá nhanh. Vui lòng chờ một lúc rồi thử lại.");
   }
 
   // Xử lý 204 No Content
