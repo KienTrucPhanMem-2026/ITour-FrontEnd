@@ -462,9 +462,10 @@ export default function BookingDetailPage() {
     }
   };
 
-  const isPending = booking?.status === "PENDING" || booking?.status === "AWAITING_PAYMENT";
+  const isPending = booking?.status === "PENDING";
+  const isAwaitingPayment = booking?.status === "AWAITING_PAYMENT";
   const { formattedTime, isExpired, progressPercent } = useBookingTimer(
-    isPending ? bookingDto?.expireAt : null
+    isAwaitingPayment ? bookingDto?.expireAt : null
   );
 
   // ── helpers ──
@@ -699,11 +700,11 @@ export default function BookingDetailPage() {
     );
   }
 
-  const status = isExpired && isPending ? "CANCELLED" : booking.status;
+  const status = isExpired && isAwaitingPayment ? "CANCELLED" : booking.status;
   const cfg = STATUS_CONFIG[status] || { text: status, bg: "bg-slate-50", textClass: "text-slate-700", border: "border-slate-100", icon: <Info className="w-3.5 h-3.5 fill-slate-500 text-white shrink-0" /> };
 
   const cancellationReason = (() => {
-    if (isExpired && isPending) {
+    if (isExpired && isAwaitingPayment) {
       return "Đơn hàng đã tự động hủy do quá thời gian thanh toán.";
     }
     if (booking.paymentStatus === "PAID") {
@@ -1392,7 +1393,28 @@ export default function BookingDetailPage() {
                   return null;
                 })()}
 
-                {isPending && !isExpired && (
+                {isPending && (
+                  <>
+                    <div className="p-4 bg-amber-50/70 border border-amber-100 rounded-2xl flex items-start gap-2.5">
+                      <Clock className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="text-xs font-black uppercase text-amber-700 mb-0.5">Đơn hàng chờ duyệt</h4>
+                        <p className="text-xs text-amber-600 leading-relaxed font-semibold">
+                          Yêu cầu đặt tour đang được điều phối viên xử lý và sắp xếp hướng dẫn viên & nhà xe phục vụ.
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setCancelModalOpen(true)}
+                      className="w-full py-3.5 bg-rose-50 hover:bg-rose-100 border border-rose-100 text-rose-600 font-black rounded-2xl text-xs uppercase tracking-wider active:scale-[0.98] transition-all"
+                    >
+                      ✕ Hủy đơn đặt tour
+                    </button>
+                  </>
+                )}
+
+                {isAwaitingPayment && !isExpired && (
                   <>
                     <div className="p-4 bg-amber-50/70 border border-amber-100 rounded-2xl">
                       <div className="flex items-center gap-1.5 text-xs text-amber-700 font-bold mb-2">
@@ -1424,13 +1446,13 @@ export default function BookingDetailPage() {
                   </>
                 )}
 
-                {isPending && isExpired && (
+                {isAwaitingPayment && isExpired && (
                   <div className="p-4 bg-rose-50/70 rounded-2xl border border-rose-100 flex items-start gap-2.5">
                     <AlertCircle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
                     <div>
                       <h4 className="text-xs font-black uppercase text-rose-700 mb-0.5">Giữ chỗ hết hạn</h4>
                       <p className="text-xs text-rose-600 leading-relaxed font-semibold">
-                        Đơn đã tự động hủy sau 15 phút chưa thanh toán.
+                        Đơn đã tự động hủy sau khi hết hạn thời gian thanh toán.
                       </p>
                     </div>
                   </div>

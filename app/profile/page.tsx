@@ -23,7 +23,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>("info");
-  const [scheduleTab, setScheduleTab] = useState<"awaiting_payment" | "upcoming" | "in_progress" | "completed" | "cancelled">("awaiting_payment");
+  const [scheduleTab, setScheduleTab] = useState<"pending" | "awaiting_payment" | "upcoming" | "in_progress" | "completed" | "cancelled">("pending");
   const [isLoading, setIsLoading] = useState(true);
 
   // Data states
@@ -374,8 +374,13 @@ export default function ProfilePage() {
               const today = new Date();
               today.setHours(0, 0, 0, 0);
 
+              const pendingTrips = bookings.filter(b =>
+                b.status === "PENDING" &&
+                b.paymentStatus !== "PAID"
+              );
+
               const awaitingPaymentTrips = bookings.filter(b =>
-                (b.status === "PENDING" || b.status === "AWAITING_PAYMENT") &&
+                b.status === "AWAITING_PAYMENT" &&
                 b.paymentStatus !== "PAID"
               );
 
@@ -400,6 +405,7 @@ export default function ProfilePage() {
               );
 
               const counts = {
+                pending: pendingTrips.length,
                 awaiting_payment: awaitingPaymentTrips.length,
                 upcoming: upcomingTrips.length,
                 in_progress: inProgressTrips.length,
@@ -408,10 +414,11 @@ export default function ProfilePage() {
               };
 
               const currentTripList =
-                scheduleTab === "awaiting_payment" ? awaitingPaymentTrips :
-                  scheduleTab === "upcoming" ? upcomingTrips :
-                    scheduleTab === "in_progress" ? inProgressTrips :
-                      scheduleTab === "completed" ? completedTrips : cancelledTrips;
+                scheduleTab === "pending" ? pendingTrips :
+                  scheduleTab === "awaiting_payment" ? awaitingPaymentTrips :
+                    scheduleTab === "upcoming" ? upcomingTrips :
+                      scheduleTab === "in_progress" ? inProgressTrips :
+                        scheduleTab === "completed" ? completedTrips : cancelledTrips;
 
               const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
                 const [timeText, setTimeText] = useState("");
@@ -483,6 +490,7 @@ export default function ProfilePage() {
                   {/* Sub Tabs Bar */}
                   <div className="flex border-b border-slate-100 gap-6 mb-6 overflow-x-auto scrollbar-none">
                     {[
+                      { id: "pending", label: "Chờ duyệt", count: counts.pending, color: "text-amber-500" },
                       { id: "awaiting_payment", label: "Chờ thanh toán", count: counts.awaiting_payment, color: "text-amber-600" },
                       { id: "upcoming", label: "Sắp khởi hành", count: counts.upcoming, color: "text-[#0EA5E9]" },
                       { id: "in_progress", label: "Đang diễn ra", count: counts.in_progress, color: "text-emerald-600" },
@@ -528,6 +536,12 @@ export default function ProfilePage() {
                             <div className="flex-grow flex flex-col justify-between">
                               <div>
                                 <div className="flex flex-wrap items-center gap-3 mb-2">
+                                  {scheduleTab === "pending" && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 font-extrabold text-[10px] uppercase rounded-full border border-amber-100 shadow-sm shrink-0">
+                                      <Clock className="w-3.5 h-3.5 fill-amber-500 text-white shrink-0" />
+                                      Đang chờ duyệt
+                                    </span>
+                                  )}
                                   {scheduleTab === "awaiting_payment" && b.expireAt && (
                                     <PaymentExpiryTimer targetDate={b.expireAt} />
                                   )}
@@ -604,6 +618,15 @@ export default function ProfilePage() {
                                   >
                                     <Eye className="w-3.5 h-3.5" /> Chi tiết chuyến đi
                                   </Link>
+
+                                  {scheduleTab === "pending" && (
+                                    <button
+                                      onClick={() => handleCancelBooking(b)}
+                                      className="px-3.5 py-1.5 text-xs font-black text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition flex items-center gap-1.5 active:scale-95 border border-rose-100/50 shadow-sm"
+                                    >
+                                      ✕ Hủy đặt tour
+                                    </button>
+                                  )}
 
                                   {scheduleTab === "awaiting_payment" && (
                                     <Link
