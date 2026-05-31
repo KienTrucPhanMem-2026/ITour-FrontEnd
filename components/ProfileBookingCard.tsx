@@ -20,7 +20,7 @@ export default function ProfileBookingCard({
   booking: BookingResponseDTO;
   onCancel: (bookingId: string) => void;
 }) {
-  const isPending = booking.status === "PENDING";
+  const isPending = booking.status === "PENDING" || booking.status === "AWAITING_PAYMENT";
   const isPaid = booking.status === "PAID" || booking.paymentStatus === "PAID" || booking.status === "CONFIRMED" || booking.status === "COMPLETED";
   const isCancelled = booking.status === "CANCELLED";
 
@@ -75,7 +75,13 @@ export default function ProfileBookingCard({
           Đã hủy
         </span>
       );
-    if (isPending)
+    if (booking.status === "AWAITING_PAYMENT")
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
+          Chờ thanh toán
+        </span>
+      );
+    if (booking.status === "PENDING")
       return (
         <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase bg-amber-50 text-amber-700 border border-amber-100">
           Đang xử lý

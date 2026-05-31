@@ -87,3 +87,16 @@ export async function updateBookingPassengersAPI(
     body: JSON.stringify(passengers),
   });
 }
+
+/**
+ * POST /api/payment/momo/create?bookingId={bookingId}
+ * Khởi tạo liên kết thanh toán MoMo cho booking
+ */
+export async function createMomoPaymentAPI(
+  bookingId: string
+): Promise<any> {
+  return apiFetch<any>(`/payment/momo/create?bookingId=${bookingId}`, {
+    method: "POST",
+  });
+}
+

@@ -23,7 +23,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>("info");
-  const [scheduleTab, setScheduleTab] = useState<"upcoming" | "in_progress" | "completed" | "cancelled">("upcoming");
+  const [scheduleTab, setScheduleTab] = useState<"awaiting_payment" | "upcoming" | "in_progress" | "completed" | "cancelled">("awaiting_payment");
   const [isLoading, setIsLoading] = useState(true);
 
   // Data states
@@ -102,7 +102,7 @@ export default function ProfilePage() {
           identityNumber: pData.identityNumber || "",
         });
       }
-      
+
       // Sort bookings descending by date (newest first)
       const sortedBookings = (bData || []).sort((a: any, b: any) => {
         return new Date(b.bookingDate).getTime() - new Date(a.bookingDate).getTime();
@@ -223,7 +223,7 @@ export default function ProfilePage() {
               ⭐ Cấp bậc: Khách hàng
             </div>
           </div>
-          
+
           {/* Stats boxes */}
           <div className="flex gap-4">
             <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-xl text-center w-28">
@@ -241,25 +241,25 @@ export default function ProfilePage() {
           {/* Left Sidebar Navigation */}
           <aside className="lg:col-span-1">
             <nav className="bg-white rounded-2xl shadow-sm border border-slate-100 p-2 flex flex-col gap-1 sticky top-24">
-              <button 
+              <button
                 onClick={() => setActiveTab("info")}
                 className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'info' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 <UserIcon className="w-4 h-4 shrink-0" /> Thông tin tài khoản
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab("bookings")}
                 className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'bookings' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 <Calendar className="w-4 h-4 shrink-0" /> Chuyến đi của tôi
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab("vouchers")}
                 className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'vouchers' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
                 <Ticket className="w-4 h-4 shrink-0" /> Ví voucher của tôi
               </button>
-              <button 
+              <button
                 onClick={() => setActiveTab("favourites")}
                 className={`flex items-center gap-3 px-4 py-3.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all ${activeTab === 'favourites' ? 'bg-sky-50 text-[#0EA5E9]' : 'text-slate-500 hover:bg-slate-50'}`}
               >
@@ -270,7 +270,7 @@ export default function ProfilePage() {
 
           {/* Main Content Area */}
           <div className="lg:col-span-3">
-            
+
             {/* -- TAB: INFO -- */}
             {activeTab === "info" && (
               <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
@@ -287,15 +287,15 @@ export default function ProfilePage() {
 
                 <form onSubmit={handleUpdateProfile} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="md:col-span-2 text-xs text-gray-400 font-medium uppercase tracking-widest mb-[-12px]">Thông tin cơ bản</div>
-                  
+
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Tên đăng nhập</label>
-                    <input type="text" disabled value={profile.userName} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-sm cursor-not-allowed"/>
+                    <input type="text" disabled value={profile.userName} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-sm cursor-not-allowed" />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Email</label>
-                    <input type="email" disabled value={profile.email} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-sm cursor-not-allowed"/>
+                    <input type="email" disabled value={profile.email} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-500 text-sm cursor-not-allowed" />
                   </div>
 
                   <div className="md:col-span-2 h-px bg-gray-100 my-2"></div>
@@ -303,41 +303,41 @@ export default function ProfilePage() {
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Họ và tên</label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
-                      value={updateForm.fullName} 
-                      onChange={e => setUpdateForm({...updateForm, fullName: e.target.value})}
+                      value={updateForm.fullName}
+                      onChange={e => setUpdateForm({ ...updateForm, fullName: e.target.value })}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm outline-none transition"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Số điện thoại</label>
-                    <input 
-                      type="tel" 
-                      value={updateForm.phone} 
-                      onChange={e => setUpdateForm({...updateForm, phone: e.target.value})}
+                    <input
+                      type="tel"
+                      value={updateForm.phone}
+                      onChange={e => setUpdateForm({ ...updateForm, phone: e.target.value })}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm outline-none transition"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Ngày sinh</label>
-                    <input 
-                      type="date" 
-                      value={updateForm.dateOfBirth} 
-                      onChange={e => setUpdateForm({...updateForm, dateOfBirth: e.target.value})}
+                    <input
+                      type="date"
+                      value={updateForm.dateOfBirth}
+                      onChange={e => setUpdateForm({ ...updateForm, dateOfBirth: e.target.value })}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm outline-none transition"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Địa chỉ</label>
-                    <input 
-                      type="text" 
-                      value={updateForm.address} 
-                      onChange={e => setUpdateForm({...updateForm, address: e.target.value})}
+                    <input
+                      type="text"
+                      value={updateForm.address}
+                      onChange={e => setUpdateForm({ ...updateForm, address: e.target.value })}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm outline-none transition"
                     />
                   </div>
@@ -347,17 +347,17 @@ export default function ProfilePage() {
                       Số CMND / CCCD / Hộ chiếu
                       <span className="ml-1.5 text-gray-400 font-normal normal-case">(dùng tự động điền khi đặt tour)</span>
                     </label>
-                    <input 
+                    <input
                       type="text"
                       placeholder="Nhập số giấy tờ tùy thân"
-                      value={updateForm.identityNumber || ""} 
-                      onChange={e => setUpdateForm({...updateForm, identityNumber: e.target.value})}
+                      value={updateForm.identityNumber || ""}
+                      onChange={e => setUpdateForm({ ...updateForm, identityNumber: e.target.value })}
                       className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-sky-500 focus:border-transparent text-sm outline-none transition"
                     />
                   </div>
 
                   <div className="md:col-span-2 flex justify-end mt-4">
-                    <button 
+                    <button
                       type="submit"
                       disabled={isUpdating}
                       className="px-8 py-3 bg-sky-600 text-white rounded-xl text-sm font-bold hover:bg-sky-700 shadow-lg shadow-sky-200 disabled:opacity-50 disabled:shadow-none transition"
@@ -374,37 +374,44 @@ export default function ProfilePage() {
               const today = new Date();
               today.setHours(0, 0, 0, 0);
 
-              const upcomingTrips = bookings.filter(b => 
-                (b.status === "CONFIRMED" || b.status === "PAID" || b.status === "PENDING") && 
+              const awaitingPaymentTrips = bookings.filter(b =>
+                (b.status === "PENDING" || b.status === "AWAITING_PAYMENT") &&
+                b.paymentStatus !== "PAID"
+              );
+
+              const upcomingTrips = bookings.filter(b =>
+                (b.status === "CONFIRMED" || b.status === "PAID") &&
                 new Date(b.startDate || b.bookingDate) > today
               );
 
-              const inProgressTrips = bookings.filter(b => 
-                (b.status === "CONFIRMED" || b.status === "PAID") && 
-                new Date(b.startDate || b.bookingDate) <= today && 
+              const inProgressTrips = bookings.filter(b =>
+                (b.status === "CONFIRMED" || b.status === "PAID") &&
+                new Date(b.startDate || b.bookingDate) <= today &&
                 new Date(b.endDate || b.bookingDate) >= today
               );
 
-              const completedTrips = bookings.filter(b => 
-                b.status === "COMPLETED" || 
+              const completedTrips = bookings.filter(b =>
+                b.status === "COMPLETED" ||
                 ((b.status === "CONFIRMED" || b.status === "PAID") && new Date(b.endDate || b.bookingDate) < today)
               );
 
-              const cancelledTrips = bookings.filter(b => 
+              const cancelledTrips = bookings.filter(b =>
                 b.status === "CANCELLED"
               );
 
               const counts = {
+                awaiting_payment: awaitingPaymentTrips.length,
                 upcoming: upcomingTrips.length,
                 in_progress: inProgressTrips.length,
                 completed: completedTrips.length,
                 cancelled: cancelledTrips.length,
               };
 
-              const currentTripList = 
-                scheduleTab === "upcoming" ? upcomingTrips :
-                scheduleTab === "in_progress" ? inProgressTrips :
-                scheduleTab === "completed" ? completedTrips : cancelledTrips;
+              const currentTripList =
+                scheduleTab === "awaiting_payment" ? awaitingPaymentTrips :
+                  scheduleTab === "upcoming" ? upcomingTrips :
+                    scheduleTab === "in_progress" ? inProgressTrips :
+                      scheduleTab === "completed" ? completedTrips : cancelledTrips;
 
               const CountdownTimer = ({ targetDate }: { targetDate: string }) => {
                 const [timeText, setTimeText] = useState("");
@@ -430,6 +437,42 @@ export default function ProfilePage() {
                 );
               };
 
+              const PaymentExpiryTimer = ({ targetDate }: { targetDate: string }) => {
+                const [timeText, setTimeText] = useState("");
+                const [isExpired, setIsExpired] = useState(false);
+
+                useEffect(() => {
+                  const updateTime = () => {
+                    const diff = new Date(targetDate).getTime() - Date.now();
+                    if (diff <= 0) {
+                      setTimeText("Hết hạn giữ chỗ!");
+                      setIsExpired(true);
+                      return;
+                    }
+                    const totalSecs = Math.floor(diff / 1000);
+                    const hours = Math.floor(totalSecs / 3600);
+                    const mins = Math.floor((totalSecs % 3600) / 60);
+                    const secs = totalSecs % 60;
+
+                    if (hours > 0) {
+                      setTimeText(`Giữ chỗ còn: ${hours}h ${mins}m`);
+                    } else {
+                      setTimeText(`Giữ chỗ còn: ${mins}m ${String(secs).padStart(2, "0")}s`);
+                    }
+                  };
+                  updateTime();
+                  const timer = setInterval(updateTime, 1000);
+                  return () => clearInterval(timer);
+                }, [targetDate]);
+
+                return (
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 font-extrabold text-[10px] uppercase rounded-full border shadow-sm shrink-0 ${isExpired ? 'bg-rose-50 text-rose-700 border-rose-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                    <Clock className={`w-3.5 h-3.5 shrink-0 ${isExpired ? 'fill-rose-500 text-white' : 'fill-amber-500 text-white animate-pulse'}`} />
+                    {timeText}
+                  </span>
+                );
+              };
+
               return (
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                   <h2 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
@@ -440,6 +483,7 @@ export default function ProfilePage() {
                   {/* Sub Tabs Bar */}
                   <div className="flex border-b border-slate-100 gap-6 mb-6 overflow-x-auto scrollbar-none">
                     {[
+                      { id: "awaiting_payment", label: "Chờ thanh toán", count: counts.awaiting_payment, color: "text-amber-600" },
                       { id: "upcoming", label: "Sắp khởi hành", count: counts.upcoming, color: "text-[#0EA5E9]" },
                       { id: "in_progress", label: "Đang diễn ra", count: counts.in_progress, color: "text-emerald-600" },
                       { id: "completed", label: "Đã hoàn thành", count: counts.completed, color: "text-purple-600" },
@@ -484,6 +528,15 @@ export default function ProfilePage() {
                             <div className="flex-grow flex flex-col justify-between">
                               <div>
                                 <div className="flex flex-wrap items-center gap-3 mb-2">
+                                  {scheduleTab === "awaiting_payment" && b.expireAt && (
+                                    <PaymentExpiryTimer targetDate={b.expireAt} />
+                                  )}
+                                  {scheduleTab === "awaiting_payment" && (
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 font-extrabold text-[10px] uppercase rounded-full border border-indigo-100 shadow-sm shrink-0">
+                                      <Clock className="w-3.5 h-3.5 fill-indigo-500 text-white shrink-0" />
+                                      Chờ thanh toán
+                                    </span>
+                                  )}
                                   {scheduleTab === "upcoming" && b.startDate && (
                                     <CountdownTimer targetDate={b.startDate} />
                                   )}
@@ -545,21 +598,39 @@ export default function ProfilePage() {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                  <Link 
+                                  <Link
                                     href={`/profile/bookings/${b.bookingId}`}
                                     className="px-3.5 py-1.5 text-xs font-black text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition flex items-center gap-1 border border-slate-100"
                                   >
                                     <Eye className="w-3.5 h-3.5" /> Chi tiết chuyến đi
                                   </Link>
 
+                                  {scheduleTab === "awaiting_payment" && (
+                                    <Link
+                                      href={`/profile/bookings/${b.bookingId}`}
+                                      className="px-4 py-1.5 text-xs font-black text-white bg-gradient-to-r from-pink-500 to-[#D82D8B] hover:from-pink-600 hover:to-[#B01E6C] rounded-xl transition shadow-md shadow-pink-100/50 flex items-center gap-1.5 active:scale-95"
+                                    >
+                                      Thanh toán ngay
+                                    </Link>
+                                  )}
+
+                                  {scheduleTab === "awaiting_payment" && (
+                                    <button
+                                      onClick={() => handleCancelBooking(b)}
+                                      className="px-3.5 py-1.5 text-xs font-black text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition flex items-center gap-1.5 active:scale-95 border border-rose-100/50 shadow-sm"
+                                    >
+                                      ✕ Hủy đặt tour
+                                    </button>
+                                  )}
+
                                   {scheduleTab === "upcoming" && (() => {
                                     const start = new Date(b.startDate || b.bookingDate);
                                     const today = new Date();
-                                    start.setHours(0,0,0,0);
-                                    today.setHours(0,0,0,0);
+                                    start.setHours(0, 0, 0, 0);
+                                    today.setHours(0, 0, 0, 0);
                                     const diffTime = start.getTime() - today.getTime();
                                     const daysBetween = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                                    
+
                                     if (daysBetween <= 0) {
                                       return (
                                         <button
@@ -571,7 +642,7 @@ export default function ProfilePage() {
                                         </button>
                                       );
                                     }
-                                    
+
                                     return (
                                       <button
                                         onClick={() => handleCancelBooking(b)}
@@ -654,19 +725,19 @@ export default function ProfilePage() {
             {/* -- TAB: VOUCHERS (VÍ VOUCHER) -- */}
             {activeTab === "vouchers" && (() => {
               const today = new Date();
-              today.setHours(0,0,0,0);
+              today.setHours(0, 0, 0, 0);
 
               const processedVouchers = vouchers.map(v => {
                 const isExpired = new Date(v.discount.endDate) < today;
                 const hoursLeft = (new Date(v.discount.endDate).getTime() - Date.now()) / 3600000;
                 const isExpiringSoon = !v.isUsed && !isExpired && hoursLeft <= 24;
-                
+
                 return { ...v, isExpired, isExpiringSoon };
               }).sort((a, b) => {
                 const scoreA = (a.isUsed || a.isExpired) ? 1 : 0;
                 const scoreB = (b.isUsed || b.isExpired) ? 1 : 0;
                 if (scoreA !== scoreB) return scoreA - scoreB;
-                
+
                 const expA = a.isExpiringSoon ? 1 : 0;
                 const expB = b.isExpiringSoon ? 1 : 0;
                 return expB - expA;
@@ -684,17 +755,17 @@ export default function ProfilePage() {
                 const cardBg = v.isUsed || v.isExpired
                   ? "grayscale bg-slate-50/10 border-slate-200/40 opacity-75"
                   : v.isExpiringSoon
-                  ? "border-rose-400/40"
-                  : "border-indigo-400/30";
+                    ? "border-rose-400/40"
+                    : "border-indigo-400/30";
 
                 const glassStyle = v.isUsed || v.isExpired
                   ? { background: "linear-gradient(135deg, rgba(148, 163, 184, 0.1) 0%, rgba(203, 213, 225, 0.1) 100%)", backdropFilter: "blur(12px)" }
                   : v.isExpiringSoon
-                  ? { background: "linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%)", backdropFilter: "blur(12px)" }
-                  : { background: "linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(99, 102, 241, 0.15) 50%, rgba(168, 85, 247, 0.15) 100%)", backdropFilter: "blur(12px)" };
+                    ? { background: "linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, rgba(245, 158, 11, 0.15) 100%)", backdropFilter: "blur(12px)" }
+                    : { background: "linear-gradient(135deg, rgba(14, 165, 233, 0.15) 0%, rgba(99, 102, 241, 0.15) 50%, rgba(168, 85, 247, 0.15) 100%)", backdropFilter: "blur(12px)" };
 
                 return (
-                  <div 
+                  <div
                     className={`relative rounded-3xl p-6 flex flex-col justify-between min-h-[160px] border shadow-md transition-all duration-300 hover:shadow-xl hover:scale-[1.02] overflow-hidden ${cardBg}`}
                     style={glassStyle}
                   >
@@ -737,13 +808,12 @@ export default function ProfilePage() {
                       {!(v.isUsed || v.isExpired) && (
                         <button
                           onClick={handleCopy}
-                          className={`px-4 py-1.5 text-xs font-black rounded-xl border transition-all active:scale-95 shrink-0 ${
-                            copied 
-                              ? "bg-emerald-500 border-emerald-500 text-white" 
+                          className={`px-4 py-1.5 text-xs font-black rounded-xl border transition-all active:scale-95 shrink-0 ${copied
+                              ? "bg-emerald-500 border-emerald-500 text-white"
                               : v.isExpiringSoon
-                              ? "bg-rose-500 border-rose-500 text-white hover:bg-rose-600"
-                              : "bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100"
-                          }`}
+                                ? "bg-rose-500 border-rose-500 text-white hover:bg-rose-600"
+                                : "bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100"
+                            }`}
                         >
                           {copied ? "Đã chép! ✓" : v.discount.code}
                         </button>
@@ -795,7 +865,7 @@ export default function ProfilePage() {
                     {favTours.map(tour => (
                       <div key={tour.id} className="relative">
                         <TourCard tour={tour} />
-                        <button 
+                        <button
                           onClick={() => handleRemoveFav(tour.id)}
                           className="absolute top-3 left-3 z-10 w-8 h-8 flex items-center justify-center bg-red-500 text-white rounded-full shadow-lg hover:bg-red-600 transition"
                           title="Bỏ yêu thích"
@@ -818,7 +888,7 @@ export default function ProfilePage() {
       {/* Custom Cancel Confirmation Modal */}
       {cancelModalOpen && bookingToCancel && (() => {
         const isPending = bookingToCancel.status === "PENDING";
-        
+
         let title = "Xác nhận hủy đặt tour";
         let description = "Bạn có chắc chắn muốn hủy đơn đặt tour này không? Slot giữ chỗ sẽ được hoàn lại và không thể hoàn tác.";
         let buttonText = "Hủy đặt tour";

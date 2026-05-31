@@ -7,7 +7,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import {
   getBookingByIdAPI, cancelBookingAPI, getBookingPaymentUrlAPI,
-  updateBookingPassengersAPI, getMyBookingsAPI,
+  updateBookingPassengersAPI, getMyBookingsAPI, createMomoPaymentAPI,
 } from "@/lib/api/bookings";
 import { getTourByIdAPI } from "@/lib/api/tours";
 import { getStoredUser } from "@/lib/auth";
@@ -374,6 +374,13 @@ const STATUS_CONFIG: Record<string, { text: string; bg: string; textClass: strin
     border: "border-amber-100",
     icon: <Clock className="w-3.5 h-3.5 fill-amber-500 text-white shrink-0" />
   },
+  AWAITING_PAYMENT: {
+    text: "Chờ thanh toán (Đã duyệt)",
+    bg: "bg-indigo-50/80",
+    textClass: "text-indigo-800 font-bold",
+    border: "border-indigo-100",
+    icon: <Clock className="w-3.5 h-3.5 fill-indigo-500 text-white shrink-0" />
+  },
   PAID: {
     text: "Đã thanh toán (Thành công)",
     bg: "bg-emerald-50/80",
@@ -435,7 +442,27 @@ export default function BookingDetailPage() {
   const [passengerForm, setPassengerForm] = useState<PassengerFormItem[]>([]);
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
-  const isPending = booking?.status === "PENDING";
+  const [paying, setPaying] = useState(false);
+
+  const handleMomoPayment = async () => {
+    if (!booking) return;
+    setPaying(true);
+    try {
+      const res = await createMomoPaymentAPI(booking.id);
+      if (res && res.payUrl) {
+        window.location.href = res.payUrl;
+      } else {
+        throw new Error("Không lấy được đường dẫn thanh toán từ MoMo.");
+      }
+    } catch (err: any) {
+      console.error("Momo Payment error:", err);
+      showToast(err.message || "Không thể khởi tạo giao dịch thanh toán MoMo.", "error");
+    } finally {
+      setPaying(false);
+    }
+  };
+
+  const isPending = booking?.status === "PENDING" || booking?.status === "AWAITING_PAYMENT";
   const { formattedTime, isExpired, progressPercent } = useBookingTimer(
     isPending ? bookingDto?.expireAt : null
   );
@@ -1040,14 +1067,16 @@ export default function BookingDetailPage() {
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3 border-t border-slate-50 flex gap-2">
-                    <button
-                      onClick={() => window.print()}
-                      className="flex-grow flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 border border-slate-200/50"
-                    >
-                      💾 Xuất hóa đơn
-                    </button>
-                  </div>
+                  {((status === "CONFIRMED" || status === "PAID" || status === "COMPLETED") && booking.paymentStatus === "PAID") && (
+                    <div className="mt-5 pt-3 border-t border-slate-50 flex flex-col gap-2.5">
+                      <button
+                        onClick={() => window.print()}
+                        className="w-full flex items-center justify-center gap-1.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-black rounded-xl text-xs uppercase tracking-wider transition-all active:scale-95 border border-slate-200/50"
+                      >
+                        Xuất hóa đơn
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1408,7 +1437,7 @@ export default function BookingDetailPage() {
                 )}
 
                 {status === "CANCELLED" ? (
-                  <Link 
+                  <Link
                     href={`/payment?tourId=${booking.tourId || bookingDto?.tourId}&scheduleId=${booking.tourScheduleId || bookingDto?.tourScheduleId}&adults=${booking.adults || 1}&children=${booking.children || 0}`}
                     className="block w-full text-center py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-2xl text-xs uppercase tracking-wider active:scale-[0.98] transition-all shadow-md shadow-indigo-100/50"
                   >
@@ -1430,7 +1459,7 @@ export default function BookingDetailPage() {
       {/* Cancel Modal */}
       {cancelModalOpen && (() => {
         const isPending = booking.status === "PENDING";
-        
+
         let title = "Xác nhận hủy đặt tour";
         let description = "Bạn có chắc muốn hủy đơn này không? Slot giữ chỗ sẽ được hoàn trả và không thể hoàn tác.";
         let buttonText = "Hủy đặt tour";
