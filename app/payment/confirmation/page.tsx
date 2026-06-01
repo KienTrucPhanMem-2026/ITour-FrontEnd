@@ -9,6 +9,16 @@ import { getTourByIdAPI } from "@/lib/api/tours";
 import { apiFetch } from "@/lib/api/config";
 import Header from "@/components/Header";
 
+function makeSlug(tourName: string): string {
+  return (tourName ?? "tour")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function ConfirmationContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get("orderId");
@@ -51,12 +61,14 @@ function ConfirmationContent() {
 
       // Fetch tour details to get departure date
       let departureDate = null;
+      let tourSlug = "";
       try {
         const tourData = await getTourByIdAPI(dto.tourId);
         const schedule = tourData.schedules?.find((s: any) => s.id === dto.tourScheduleId);
         if (schedule) {
           departureDate = schedule.startDate;
         }
+        tourSlug = makeSlug(tourData.name);
       } catch (e) {
         console.error("Lỗi khi tải thông tin tour:", e);
       }
@@ -69,6 +81,8 @@ function ConfirmationContent() {
         status: dto.status,
         paymentStatus: dto.paymentStatus,
         totalPrice: dto.finalPrice,
+        tourId: dto.tourId,
+        tourSlug,
       });
     } catch (err: any) {
       console.error(err);
@@ -182,10 +196,10 @@ function ConfirmationContent() {
         <div className="bg-white rounded-3xl shadow-2xl p-12 text-center mb-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
           {/* Status Icon */}
           <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${isPaid
-              ? 'bg-green-50 border border-green-100'
-              : isFailed
-                ? 'bg-red-50 border border-red-100'
-                : 'bg-amber-50 border border-amber-100'
+            ? 'bg-green-50 border border-green-100'
+            : isFailed
+              ? 'bg-red-50 border border-red-100'
+              : 'bg-amber-50 border border-amber-100'
             }`}>
             {isPaid ? (
               <svg
@@ -264,9 +278,18 @@ function ConfirmationContent() {
 
               <div className="flex justify-between items-center pb-3 border-b border-gray-100">
                 <span className="text-gray-500">Tour:</span>
-                <span className="font-extrabold text-slate-900 text-right max-w-[70%] line-clamp-1">
-                  {booking.tourTitle}
-                </span>
+                {booking.tourSlug ? (
+                  <Link
+                    href={`/tours/${booking.tourSlug}?id=${booking.tourId}`}
+                    className="font-extrabold text-[#0EA5E9] hover:underline text-right max-w-[70%] line-clamp-1"
+                  >
+                    {booking.tourTitle}
+                  </Link>
+                ) : (
+                  <span className="font-extrabold text-slate-900 text-right max-w-[70%] line-clamp-1">
+                    {booking.tourTitle}
+                  </span>
+                )}
               </div>
 
               <div className="flex justify-between items-center pb-3 border-b border-gray-100">
@@ -290,10 +313,10 @@ function ConfirmationContent() {
               <div className="flex justify-between items-center pb-3 border-b border-gray-100">
                 <span className="text-gray-500">Trạng thái:</span>
                 <span className={`px-2.5 py-0.5 rounded-full font-black text-[10px] uppercase tracking-wider ${isPaid
-                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    : isFailed
-                      ? "bg-red-50 text-red-600 border border-red-100"
-                      : "bg-amber-50 text-amber-600 border border-amber-100"
+                  ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                  : isFailed
+                    ? "bg-red-50 text-red-600 border border-red-100"
+                    : "bg-amber-50 text-amber-600 border border-amber-100"
                   }`}>
                   {isPaid ? "✓ Đã thanh toán" : isFailed ? "Thất bại / Đã hủy" : "Đang xử lý"}
                 </span>
@@ -401,10 +424,10 @@ function ConfirmationContent() {
               📞 Hotline: 0901234567
             </a>
             <a
-              href="mailto:support@dulichviet.com"
+              href="mailto:support@itour.com"
               className="px-4 py-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-xs font-bold text-slate-700 shadow-sm"
             >
-              📧 Email: support@dulichviet.com
+              📧 Email: support@itour.com
             </a>
           </div>
         </div>

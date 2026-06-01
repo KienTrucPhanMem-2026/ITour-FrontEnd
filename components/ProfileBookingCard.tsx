@@ -21,6 +21,7 @@ export default function ProfileBookingCard({
   onCancel: (bookingId: string) => void;
 }) {
   const isPending = booking.status === "PENDING";
+  const isAwaitingPayment = booking.status === "AWAITING_PAYMENT";
   const isPaid = booking.status === "PAID" || booking.paymentStatus === "PAID" || booking.status === "CONFIRMED" || booking.status === "COMPLETED";
   const isCancelled = booking.status === "CANCELLED";
 
@@ -31,11 +32,11 @@ export default function ProfileBookingCard({
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const { formattedTime, isExpired, progressPercent } = useBookingTimer(
-    isPending ? booking.expireAt : null
+    isAwaitingPayment ? booking.expireAt : null
   );
 
   useEffect(() => {
-    if (!isPending || currentPaymentUrl || isExpired) {
+    if (!isAwaitingPayment || currentPaymentUrl || isExpired) {
       if (pollingRef.current) clearInterval(pollingRef.current);
       return;
     }
@@ -55,7 +56,7 @@ export default function ProfileBookingCard({
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [isPending, currentPaymentUrl, isExpired, booking.bookingId]);
+  }, [isAwaitingPayment, currentPaymentUrl, isExpired, booking.bookingId]);
 
   const handlePayNow = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -69,13 +70,19 @@ export default function ProfileBookingCard({
           Đã thanh toán
         </span>
       );
-    if (isCancelled || (isPending && isExpired))
+    if (isCancelled || (isAwaitingPayment && isExpired))
       return (
         <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase bg-rose-50 text-rose-700 border border-rose-100">
           Đã hủy
         </span>
       );
-    if (isPending)
+    if (booking.status === "AWAITING_PAYMENT")
+      return (
+        <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase bg-indigo-50 text-indigo-700 border border-indigo-100">
+          Chờ thanh toán
+        </span>
+      );
+    if (booking.status === "PENDING")
       return (
         <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase bg-amber-50 text-amber-700 border border-amber-100">
           Đang xử lý
@@ -154,7 +161,7 @@ export default function ProfileBookingCard({
               )
             )}
 
-            {isPending && !isExpired && (
+            {(isPending || (isAwaitingPayment && !isExpired)) && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -169,8 +176,8 @@ export default function ProfileBookingCard({
         </div>
       </div>
 
-      {/* Countdown & Payment Section for PENDING booking */}
-      {isPending && !isExpired && (
+      {/* Countdown & Payment Section for AWAITING_PAYMENT booking */}
+      {isAwaitingPayment && !isExpired && (
         <div className="p-4 bg-amber-50/70 rounded-2xl border border-amber-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-grow">
             <p className="text-xs text-amber-700 font-bold mb-1.5 flex items-center gap-1.5">
@@ -211,7 +218,7 @@ export default function ProfileBookingCard({
         </div>
       )}
 
-      {isPending && isExpired && (
+      {isAwaitingPayment && isExpired && (
         <div className="p-3.5 bg-rose-50/70 rounded-2xl border border-rose-100 flex items-center gap-2">
           <AlertCircle className="w-4 h-4 fill-rose-500 text-rose-500 shrink-0" />
           <p className="text-xs text-rose-700 font-bold">
