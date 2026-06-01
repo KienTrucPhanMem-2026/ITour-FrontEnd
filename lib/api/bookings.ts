@@ -61,14 +61,25 @@ export async function updateBookingPassengersAPI(
   return res.data;
 }
 
-/**
- * POST /api/payment/momo/create?bookingId={bookingId}
- * Khởi tạo liên kết thanh toán MoMo cho booking
- */
 export async function createMomoPaymentAPI(
   bookingId: string
 ): Promise<any> {
   const res = await axiosClient.post<any>(`/payment/momo/create?bookingId=${bookingId}`);
   return res.data;
+}
+
+/**
+ * PUT /api/bookings/{id}/checkout-details
+ * Cập nhật thông tin voucher và điểm thưởng cho booking hiện tại trước khi thanh toán
+ */
+export async function updateCheckoutDetailsAPI(
+  bookingId: string,
+  dto: BookingRequestDTO
+): Promise<BookingResponseDTO> {
+  const res = await axiosClient.put<ApiResponse<BookingResponseDTO>>(
+    `/bookings/${bookingId}/checkout-details`,
+    dto
+  );
+  return res.data.data;
 }
 
