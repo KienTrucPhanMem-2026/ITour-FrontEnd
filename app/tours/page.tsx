@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -15,6 +15,7 @@ import type { SearchSuggestion } from "@/components/SearchBar";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { isDomesticTour } from "@/lib/tourHelpers";
+import { loadTourCache, saveTourCache } from "@/lib/toursCache";
 
 const TOUR_TYPE_LABELS: Record<string, string> = {
   BEACH: "Biển",
@@ -196,14 +197,22 @@ function ToursPageContent() {
   }, [searchParams]);
 
   const fetchTours = async () => {
+    // Dung cache tu sessionStorage neu vua tu Homepage sang, tranh fetch lai API
+    const cached = loadTourCache();
+    if (cached && cached.length > 0) {
+      setAllTours(cached);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
       const data = await getToursAPI();
       setAllTours(data);
+      saveTourCache(data);
     } catch (err) {
       console.error("Failed to fetch tours:", err);
-      setError("Không thể tải danh sách tour. Vui lòng thử lại.");
+      setError("Kh\u00f4ng th\u1ec3 t\u1ea3i danh s\u00e1ch tour. Vui l\u00f2ng th\u1eed l\u1ea1i.");
     } finally {
       setLoading(false);
     }
@@ -762,3 +771,5 @@ export default function ToursPage() {
     </Suspense>
   );
 }
+
+
