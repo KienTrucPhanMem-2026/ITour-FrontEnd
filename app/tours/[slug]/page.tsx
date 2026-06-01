@@ -3,9 +3,11 @@
 import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Heart } from "lucide-react";
 import { getTourByIdAPI, getTourItinerariesAPI } from "@/lib/api/tours";
 import { getStoredUser } from "@/lib/auth";
 import { getMyBookingsAPI, createBookingAPI } from "@/lib/api/bookings";
+import { checkIsFavouriteAPI, addFavouriteAPI, removeFavouriteAPI } from "@/lib/api/favourites";
 import ReviewList from "@/components/ReviewList";
 import ReviewForm from "@/components/ReviewForm";
 import type { TourDTO, UserProfile } from "@/types/api";
@@ -113,6 +115,7 @@ function TourDetailContent() {
   const [tour, setTour] = useState<TourDTO | null>(null);
   const [loadingTour, setLoadingTour] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFavorite, setIsFavorite] = useState(false);
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>("");
   const [adults, setAdults] = useState(1);
   const [children, setChildren] = useState(0);
@@ -171,7 +174,12 @@ function TourDetailContent() {
     setCurrentUser(user);
     if (tourId) {
       fetchTourData(tourId);
-      if (user?.id) fetchUserBookings(user.id);
+      if (user?.id) {
+        fetchUserBookings(user.id);
+        checkIsFavouriteAPI(user.id, tourId)
+          .then((res) => setIsFavorite(res))
+          .catch((err) => console.error("Lỗi khi kiểm tra trạng thái yêu thích:", err));
+      }
     }
   }, [tourId]);
 
@@ -370,6 +378,29 @@ function TourDetailContent() {
 
   const hasBookedThisTour = tourBookings.length > 0;
 
+  const handleToggleFavorite = async () => {
+    const user = getStoredUser();
+    if (!user) {
+      alert("Vui lòng đăng nhập để thực hiện chức năng này!");
+      return;
+    }
+
+    try {
+      if (isFavorite) {
+        await removeFavouriteAPI(user.id, tourId);
+        setIsFavorite(false);
+        showToast("Đã xóa khỏi danh sách yêu thích.", "success");
+      } else {
+        await addFavouriteAPI(user.id, tourId);
+        setIsFavorite(true);
+        showToast("Đã thêm vào danh sách yêu thích.", "success");
+      }
+    } catch (err) {
+      console.error("Lỗi khi cập nhật yêu thích:", err);
+      showToast("Đã xảy ra lỗi, vui lòng thử lại sau!", "error");
+    }
+  };
+
   if (loadingTour) return <div className="p-20 text-center text-slate-400 animate-pulse font-medium">Đang chuẩn bị hành trình của bạn...</div>;
   if (error || !tour) return <div className="p-20 text-center text-red-500 font-bold">{error || "Tour không tồn tại"}</div>;
 
@@ -391,6 +422,20 @@ function TourDetailContent() {
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" 
               alt="Tour main"
             />
+            {/* Glassmorphic Heart Button at top-right of main image */}
+            <button
+              onClick={handleToggleFavorite}
+              className="absolute top-4 right-4 z-10 w-11 h-11 rounded-full flex items-center justify-center bg-white/25 hover:bg-white/35 backdrop-blur-md border border-white/30 transition-all duration-300 active:scale-95 shadow-md group/fav"
+              title={isFavorite ? "Bỏ yêu thích" : "Yêu thích"}
+            >
+              <Heart
+                className={`w-6 h-6 transition-all duration-300 ${
+                  isFavorite
+                    ? "fill-rose-500 text-rose-500 scale-110"
+                    : "text-white group-hover/fav:scale-105"
+                }`}
+              />
+            </button>
           </div>
           <div className="lg:col-span-4 grid grid-cols-3 lg:grid-cols-1 gap-4">
             {images.map((img, i) => (
@@ -980,8 +1025,16 @@ function TourDetailContent() {
                 💬 Nhận tư vấn về tour này
               </button>
               
-              <button className="w-full py-2 text-slate-400 font-bold text-[10px] hover:text-rose-500 transition-colors uppercase tracking-widest">
-                ♥ Lưu vào mục yêu thích
+              <button
+                onClick={handleToggleFavorite}
+                className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+                  isFavorite
+                    ? "bg-rose-50 border-rose-100 text-rose-600 hover:bg-rose-100"
+                    : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-800"
+                }`}
+              >
+                <Heart className={`w-4 h-4 transition-transform duration-300 ${isFavorite ? "fill-rose-500 text-rose-500 scale-110" : "text-slate-400"}`} />
+                {isFavorite ? "Đã yêu thích" : "Lưu vào mục yêu thích"}
               </button>
 
               <div className="mt-6 pt-4 border-t border-slate-50 flex justify-between gap-3">

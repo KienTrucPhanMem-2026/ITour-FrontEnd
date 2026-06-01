@@ -148,14 +148,14 @@ export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: stri
             <Link href="/tours" className="hdr__nav-link">
               Tour du lịch
             </Link>
-            
+
             <Link href="/" className="hdr__logo">
               <img src={logoSrc} alt="iTour Logo" className="hdr__logo-img" />
             </Link>
-            
-            <a href="#" className="hdr__nav-link">
-              Tin tức
-            </a>
+
+            <Link href="/blogs" className="hdr__nav-link">
+              Blogs
+            </Link>
           </div>
 
           {/* RIGHT COLUMN: Actions / Auth */}
