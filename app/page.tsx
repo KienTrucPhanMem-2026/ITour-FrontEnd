@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
@@ -12,6 +12,7 @@ import type { TourDTO } from "@/types/api";
 import Footer from "@/components/Footer";
 import Header from "@/components/Header";
 import { isDomesticTour } from "@/lib/tourHelpers";
+import { saveTourCache } from "@/lib/toursCache";
 
 export default function HomePage() {
   const router = useRouter();
@@ -78,10 +79,19 @@ export default function HomePage() {
 
   useEffect(() => {
     getToursAPI()
-      .then((data) => setAllTours(data))
+      .then((data) => { setAllTours(data); saveTourCache(data); })
       .catch(() => setAllTours([]))
       .finally(() => setLoadingTours(false));
   }, []);
+
+  // Click vào Bento card → navigate sang /tours với keyword tương ứng
+  // Tours page đọc ?q= để filter theo searchTerm, không cần fetch lại API
+  const handleBentoClick = (keyword: string, category?: "domestic" | "international") => {
+    const params = new URLSearchParams();
+    params.set("q", keyword);
+    if (category) params.set("category", category);
+    router.push(`/tours?${params.toString()}`);
+  };
 
   const featuredTours = allTours.slice(0, 10);
   const domesticTours = allTours.filter(isDomesticTour);
@@ -150,7 +160,7 @@ export default function HomePage() {
             Điểm Đến Hàng Đầu.
           </h2>
           <p className="text-slate-500 text-sm md:text-base">
-            Những điểm du lịch nổi tiếng, độc đáo và được khách du lịch lựa chọn nhiều nhất cho kỳ nghỉ của mình.
+            Lựa chọn từ những điểm đến nổi tiếng nhất Việt Nam — từ vịnh kỳ quan đến phố cổ trầm mặc.
           </p>
         </div>
 
@@ -158,7 +168,10 @@ export default function HomePage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
 
           {/* Card 1: Hạ Long (Spans 2 columns, 2 rows) */}
-          <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-2 md:row-span-2 h-[500px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
+          <div
+            onClick={() => handleBentoClick("Hạ Long", "domestic")}
+            className="relative rounded-[2.5rem] overflow-hidden md:col-span-2 md:row-span-2 h-[500px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100"
+          >
             <img
               src="https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=1000&fit=crop"
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
@@ -178,13 +191,16 @@ export default function HomePage() {
                 Kỳ quan thiên nhiên thế giới với hàng nghìn đảo đá vôi kỳ vĩ.
               </p>
               <span className="text-xs font-bold text-white tracking-widest uppercase bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-xl transition duration-300">
-                12+ Tours →
+                {allTours.filter(t => t.endDestinationName?.toLowerCase().includes("hạ long") || t.name?.toLowerCase().includes("hạ long")).length || "12"}+ Tours →
               </span>
             </div>
           </div>
 
-          {/* Card 2: Sapa (Spans 2 columns, 1 row) */}
-          <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-2 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
+          {/* Card 2: Sa Pa (Spans 2 columns, 1 row) */}
+          <div
+            onClick={() => handleBentoClick("Sa Pa", "domestic")}
+            className="relative rounded-[2.5rem] overflow-hidden md:col-span-2 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100"
+          >
             <img
               src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=400&fit=crop"
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
@@ -204,13 +220,16 @@ export default function HomePage() {
                 Thị trấn mờ sương với ruộng bậc thang đẹp nhất thế giới.
               </p>
               <span className="text-[10px] font-bold text-white tracking-widest uppercase bg-white/10 px-3 py-1.5 rounded-lg border border-white/10 transition duration-300">
-                8+ Tours
+                {allTours.filter(t => t.endDestinationName?.toLowerCase().includes("sa pa") || t.name?.toLowerCase().includes("sapa") || t.name?.toLowerCase().includes("sa pa")).length || "8"}+ Tours
               </span>
             </div>
           </div>
 
           {/* Card 3: Hội An (Spans 1 column, 1 row) */}
-          <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-1 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
+          <div
+            onClick={() => handleBentoClick("Hội An", "domestic")}
+            className="relative rounded-[2.5rem] overflow-hidden md:col-span-1 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100"
+          >
             <img
               src="https://images.unsplash.com/photo-1499209974431-9dddcece7f88?w=400&h=400&fit=crop"
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
@@ -228,13 +247,16 @@ export default function HomePage() {
               </h3>
               <p className="text-slate-200 text-[11px] font-light mb-3">Phố cổ lung linh sắc đèn lồng.</p>
               <span className="text-[9px] font-bold text-white tracking-widest uppercase bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/10 transition duration-300">
-                6+ Tours
+                {allTours.filter(t => t.endDestinationName?.toLowerCase().includes("hội an") || t.name?.toLowerCase().includes("hội an")).length || "6"}+ Tours
               </span>
             </div>
           </div>
 
           {/* Card 4: Phú Quốc (Spans 1 column, 1 row) */}
-          <div className="relative rounded-[2.5rem] overflow-hidden md:col-span-1 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100">
+          <div
+            onClick={() => handleBentoClick("Phú Quốc", "domestic")}
+            className="relative rounded-[2.5rem] overflow-hidden md:col-span-1 md:row-span-1 h-[238px] group cursor-pointer shadow-lg hover:shadow-2xl transition-all duration-500 border border-slate-100"
+          >
             <img
               src="https://images.unsplash.com/photo-1564760055-e1993d43e54f?w=400&h=400&fit=crop"
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
@@ -252,7 +274,7 @@ export default function HomePage() {
               </h3>
               <p className="text-slate-200 text-[11px] font-light mb-3">Đảo ngọc hoang sơ bãi cát trắng.</p>
               <span className="text-[9px] font-bold text-white tracking-widest uppercase bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/10 transition duration-300">
-                10+ Tours
+                {allTours.filter(t => t.endDestinationName?.toLowerCase().includes("phú quốc") || t.name?.toLowerCase().includes("phú quốc")).length || "10"}+ Tours
               </span>
             </div>
           </div>
@@ -498,3 +520,4 @@ export default function HomePage() {
     </div>
   );
 }
+

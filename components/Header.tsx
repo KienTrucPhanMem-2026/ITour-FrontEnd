@@ -148,11 +148,11 @@ export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: stri
             <Link href="/tours" className="hdr__nav-link">
               Tour du lịch
             </Link>
-            
+
             <Link href="/" className="hdr__logo">
               <img src={logoSrc} alt="iTour Logo" className="hdr__logo-img" />
             </Link>
-            
+
             <a href="#" className="hdr__nav-link">
               Tin tức
             </a>
@@ -193,12 +193,20 @@ export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: stri
                 <div className="user-wrap" ref={userDropRef}>
                   <button
                     onClick={toggleUserDrop}
-                    className={`hdr__avatar-btn${userDropOpen ? " hdr__avatar-btn--active" : ""}`}
+                    className={`user-wrap__btn${userDropOpen ? " user-wrap__btn--active" : ""}`}
                     aria-label="Tài khoản cá nhân"
                   >
-                    {(currentUser.fullName || currentUser.userName || "U")
-                      .charAt(0)
-                      .toUpperCase()}
+                    <span className={`hdr__avatar-btn${userDropOpen ? " hdr__avatar-btn--active" : ""}`}>
+                      {(currentUser.fullName || currentUser.userName || "U")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </span>
+                    <span className="hdr__avatar-name">
+                      {currentUser.fullName || currentUser.userName || "Tài khoản"}
+                    </span>
+                    <svg className="hdr__avatar-chevron" viewBox="0 0 16 16" fill="currentColor" width="12" height="12">
+                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                   </button>
 
                   {userDropOpen && (
@@ -206,7 +214,9 @@ export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: stri
                       {/* User Info Header */}
                       <div className="user-drop__header">
                         <p className="user-drop__name">
+
                           {currentUser.fullName || currentUser.userName}
+
                         </p>
                         <p className="user-drop__role">Khách hàng</p>
                       </div>
@@ -397,9 +407,28 @@ export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: stri
         }
 
         /* === Avatar Button === */
+        .user-wrap__btn {
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 2px 8px 2px 2px;
+          border-radius: 999px;
+          transition: background 0.15s;
+        }
+        .user-wrap__btn:hover {
+          background: rgba(14, 165, 233, 0.08);
+        }
+        .user-wrap__btn--active .hdr__avatar-btn {
+          box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.4);
+          background: #0284C7;
+        }
         .hdr__avatar-btn {
           width: 34px;
           height: 34px;
+          flex-shrink: 0;
           border-radius: 50%;
           background: #0EA5E9;
           color: #fff;
@@ -409,7 +438,6 @@ export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: stri
           align-items: center;
           justify-content: center;
           border: 2px solid transparent;
-          cursor: pointer;
           transition: all 0.15s;
         }
         .hdr__avatar-btn:hover {
@@ -418,6 +446,31 @@ export default function Header({ logoSrc = "/assets/3-3.png" }: { logoSrc?: stri
         .hdr__avatar-btn--active {
           box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.4);
           background: #0284C7;
+        }
+        .hdr__avatar-name {
+          font-size: 13px;
+          font-weight: 600;
+          color: #1e293b;
+          white-space: nowrap;
+          max-width: 120px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          display: none;
+        }
+        .hdr__avatar-chevron {
+          color: #64748b;
+          flex-shrink: 0;
+          display: none;
+          transition: transform 0.2s;
+        }
+        .user-wrap__btn--active .hdr__avatar-chevron {
+          transform: rotate(180deg);
+        }
+        @media (min-width: 768px) {
+          .hdr__avatar-name,
+          .hdr__avatar-chevron {
+            display: block;
+          }
         }
 
         /* === User Dropdown Menu === */
