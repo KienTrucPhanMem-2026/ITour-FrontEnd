@@ -27,3 +27,18 @@ body {
     @apply px-6 py-3 border border-[#0EA5E9] text-[#0EA5E9] font-semibold rounded-full hover:bg-blue-50 transition-colors;
   }
 }
+
+@keyframes user-drop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-user-drop-in {
+  animation: user-drop-in 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
