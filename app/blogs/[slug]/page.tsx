@@ -107,9 +107,16 @@ export default function BlogDetailPage() {
         // Related blogs: same tag, excluding current
         const related = allBlogs.filter((rb) => rb.id !== b.id && rb.tag === b.tag).slice(0, 3);
         setRelatedBlogs(related);
-        // Related tours: pick random 3
-        const shuffled = [...allTours].sort(() => Math.random() - 0.5);
-        setRelatedTours(shuffled.slice(0, 3));
+        
+        // Related tours: use linked tours from blog if present, else fallback to random 3
+        if (b.tourIds) {
+          const linkedIds = b.tourIds.split(",").filter(Boolean);
+          const filteredTours = allTours.filter((t) => linkedIds.includes(t.id));
+          setRelatedTours(filteredTours.slice(0, 4)); // limit to max 4
+        } else {
+          const shuffled = [...allTours].sort(() => Math.random() - 0.5);
+          setRelatedTours(shuffled.slice(0, 3));
+        }
       })
       .catch(() => router.push("/blogs"))
       .finally(() => setLoading(false));

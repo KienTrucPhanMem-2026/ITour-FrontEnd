@@ -18,6 +18,7 @@ export interface BlogDTO {
   viewCount: number;
   createdAt: string;
   updatedAt: string;
+  tourIds?: string;
   consultant?: {
     id: string;
     fullName: string;
