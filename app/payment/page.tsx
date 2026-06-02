@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createBookingAPI, getBookingPaymentUrlAPI } from "@/lib/api/bookings";
+import { createBookingAPI, getBookingPaymentUrlAPI, getBookingByIdAPI, createMomoPaymentAPI, updateCheckoutDetailsAPI } from "@/lib/api/bookings";
 import { getTourByIdAPI, getDiscountsByTourAPI } from "@/lib/api/tours";
-import { getUserVouchersAPI } from "@/lib/api/users";
+import { getUserVouchersAPI, getUserProfileAPI } from "@/lib/api/users";
 import { useCurrentUser } from "@/hooks/useAuth";
 import { useProtectedRoute } from "@/hooks/useProtectedRoute";
 import { useBookingTimer } from "@/hooks/useBookingTimer";
@@ -42,10 +42,18 @@ function PaymentContent() {
   const isReady = useProtectedRoute(); // Bảo vệ trang - redirect nếu chưa login
   const currentUser = useCurrentUser();
 
-  const tourId = searchParams.get("tourId") ?? "";
-  const scheduleId = searchParams.get("scheduleId") ?? "";
-  const adults = parseInt(searchParams.get("adults") ?? "1");
-  const children = parseInt(searchParams.get("children") ?? "0");
+  const bookingId = searchParams.get("bookingId") ?? "";
+  const [existingBooking, setExistingBooking] = useState<any | null>(null);
+
+  const urlTourId = searchParams.get("tourId") ?? "";
+  const urlScheduleId = searchParams.get("scheduleId") ?? "";
+  const tourId = existingBooking ? (existingBooking.tourId || existingBooking.tour?.id || urlTourId || "") : urlTourId;
+  const scheduleId = existingBooking ? (existingBooking.tourScheduleId || existingBooking.tourSchedule?.id || urlScheduleId || "") : urlScheduleId;
+
+  const urlAdults = parseInt(searchParams.get("adults") ?? "1");
+  const urlChildren = parseInt(searchParams.get("children") ?? "0");
+  const adults = existingBooking ? (existingBooking.adults ?? 1) : urlAdults;
+  const children = existingBooking ? (existingBooking.children ?? 0) : urlChildren;
 
   const [tour, setTour] = useState<TourDTO | null>(null);
   const [schedule, setSchedule] = useState<TourScheduleDTO | null>(null);
@@ -67,6 +75,11 @@ function PaymentContent() {
   const [promoError, setPromoError] = useState<string | null>(null);
   const [tempSelectedDiscount, setTempSelectedDiscount] = useState<any | null>(null);
 
+  // ── Loyalty Points State ──
+  const [pointsToUse, setPointsToUse] = useState<number>(0);
+  const [pointsInput, setPointsInput] = useState<string>("");
+  const [pointsError, setPointsError] = useState<string | null>(null);
+
   // ── Async booking workflow state ──
   const [pendingBooking, setPendingBooking] = useState<BookingResponseDTO | null>(null);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
@@ -84,6 +97,22 @@ function PaymentContent() {
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
+  // ── Profile fetch state ──
+  const [profile, setProfile] = useState<any | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.id) {
+      getUserProfileAPI(currentUser.id)
+        .then((data) => {
+          setProfile(data);
+        })
+        .catch((err) => {
+          console.error("Lỗi khi tải profile mới nhất:", err);
+          setProfile(currentUser);
+        });
+    }
+  }, [currentUser]);
+
   // Fill user info once loaded
   useEffect(() => {
     if (currentUser) {
@@ -96,27 +125,44 @@ function PaymentContent() {
     }
   }, [currentUser]);
 
-  // Fetch tour + schedule từ embedded schedules
+  // Fetch tour + schedule từ embedded schedules (hỗ trợ bookingId)
   useEffect(() => {
-    if (!isReady || !tourId) return;
+    if (!isReady) return;
     const load = async () => {
       try {
         setLoadingData(true);
-        const tourData = await getTourByIdAPI(tourId);
-        setTour(tourData);
-        // Lấy schedule từ tour.schedules thay vì gọi API riêng
-        if (scheduleId && tourData.schedules) {
-          const found = tourData.schedules.find((s) => s.id === scheduleId);
-          setSchedule(found ?? null);
+        if (bookingId) {
+          const bData = await getBookingByIdAPI(bookingId);
+          setExistingBooking(bData);
+          
+          const tId = bData.tourId || bData.tour?.id;
+          const tourData = await getTourByIdAPI(tId);
+          setTour(tourData);
+          
+          const sId = bData.tourScheduleId || bData.tourSchedule?.id || urlScheduleId;
+          if (sId && tourData.schedules) {
+            const found = tourData.schedules.find((s: any) => s.id === sId);
+            setSchedule(found ?? bData.tourSchedule ?? null);
+          } else {
+            setSchedule(bData.tourSchedule ?? null);
+          }
+        } else if (urlTourId) {
+          const tourData = await getTourByIdAPI(urlTourId);
+          setTour(tourData);
+          if (urlScheduleId && tourData.schedules) {
+            const found = tourData.schedules.find((s) => s.id === urlScheduleId);
+            setSchedule(found ?? null);
+          }
         }
-      } catch {
+      } catch (err) {
+        console.error("Lỗi khi tải dữ liệu checkout:", err);
         setApiError("Không thể tải thông tin tour. Vui lòng quay lại.");
       } finally {
         setLoadingData(false);
       }
     };
     load();
-  }, [isReady, tourId, scheduleId]);
+  }, [isReady, bookingId, urlTourId, urlScheduleId]);
 
   // Fetch discounts & vouchers
   useEffect(() => {
@@ -180,7 +226,7 @@ function PaymentContent() {
   const unitPrice = schedule?.price ?? tour?.price ?? 0;
   const adultTotal = unitPrice * adults;
   const childTotal = unitPrice * 0.7 * children;
-  const totalPrice = adultTotal + childTotal;
+  const totalPrice = existingBooking ? (existingBooking.totalPrice ?? (adultTotal + childTotal)) : (adultTotal + childTotal);
 
   // Calculate discount amount
   let discountAmount = 0;
@@ -191,7 +237,35 @@ function PaymentContent() {
       discountAmount = selectedDiscount.discountAmount;
     }
   }
-  const finalPrice = Math.max(0, totalPrice - discountAmount);
+
+  // Loyalty points discount (1 point = 100 VND)
+  const pointsMultiplier = profile?.pointsMultiplier ?? 1.0;
+  const tierDiscountPercentage = profile?.discountPercentage ?? 0.0;
+  const tierDiscountAmount = totalPrice * (tierDiscountPercentage / 100);
+
+  const pointDiscount = pointsToUse * 100;
+  const finalPrice = Math.max(0, totalPrice - discountAmount - tierDiscountAmount - pointDiscount);
+
+  // Adjust pointsToUse if a voucher/membership discount reduces total price below the points value
+  useEffect(() => {
+    const remaining = totalPrice - discountAmount - tierDiscountAmount;
+    if (pointsToUse * 100 > remaining) {
+      const newMaxPoints = Math.floor(remaining / 100);
+      setPointsToUse(newMaxPoints);
+      setPointsInput(newMaxPoints > 0 ? newMaxPoints.toString() : "");
+      setPointsError(null);
+    }
+  }, [selectedDiscount, totalPrice, discountAmount, tierDiscountAmount]);
+
+  const handleUseMaxPoints = () => {
+    const maxPoints = Math.min(
+      profile?.point ?? 0,
+      Math.floor((totalPrice - discountAmount - tierDiscountAmount) / 100)
+    );
+    setPointsToUse(maxPoints);
+    setPointsInput(maxPoints.toString());
+    setPointsError(null);
+  };
 
   const availableDiscounts = tourDiscounts.map((d) => {
     const userVoucher = userVouchers.find((uv) => uv.discount?.id === d.id);
@@ -245,36 +319,56 @@ function PaymentContent() {
       if (!currentUser || !tour || !scheduleId) return;
 
       setLoading(true);
-    try {
-      const bookingRequest: any = {
-        customerId: currentUser.id,
-        tourId: tour.id,
-        tourScheduleId: scheduleId,
-        adults,
-        children,
-        paymentMethod,
-        discountId: selectedDiscount?.id || null,
-      };
+      try {
+        const bookingRequest: any = {
+          customerId: currentUser.id,
+          tourId: tour.id,
+          tourScheduleId: scheduleId,
+          adults,
+          children,
+          paymentMethod,
+          discountId: selectedDiscount?.id || null,
+          pointsToUse: pointsToUse > 0 ? pointsToUse : null,
+        };
 
-      // Tất cả phương thức đều dùng createBookingAPI — trả về 201 ngay lập tức
-      // Consumer sẽ bất đồng bộ tạo payment URL rồi cập nhập vào DB
-      const result = await createBookingAPI(bookingRequest);
-
-      if (paymentMethod === "MOMO") {
-        // Hiển thị màn hình đặt tôr thành công + countdown + chờ payment URL
-        setPendingBooking(result);
-      } else {
-        // Phương thức khác: lưu và chuyển hướng
-        sessionStorage.setItem("lastBooking", JSON.stringify(result));
-        router.push(`/payment/confirmation?bookingId=${result.bookingId}`);
-      }
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setApiError(err.message);
-      } else {
-        setApiError("Đặt tour thất bại. Vui lòng thử lại.");
-      }
-      console.error("Booking error:", err);
+        let result;
+        if (bookingId) {
+          result = await updateCheckoutDetailsAPI(bookingId, bookingRequest);
+          if (paymentMethod === "MOMO") {
+            setPendingBooking(result);
+            try {
+              const res = await createMomoPaymentAPI(bookingId);
+              if (res && res.payUrl) {
+                setPaymentUrl(res.payUrl);
+              } else {
+                throw new Error("Không lấy được đường dẫn thanh toán từ MoMo.");
+              }
+            } catch (err: any) {
+              setApiError(err.message || "Không thể khởi tạo giao dịch thanh toán MoMo.");
+              setPendingBooking(null);
+              setLoading(false);
+              return;
+            }
+          } else {
+            sessionStorage.setItem("lastBooking", JSON.stringify(result));
+            router.push(`/payment/confirmation?bookingId=${result.bookingId}`);
+          }
+        } else {
+          result = await createBookingAPI(bookingRequest);
+          if (paymentMethod === "MOMO") {
+            setPendingBooking(result);
+          } else {
+            sessionStorage.setItem("lastBooking", JSON.stringify(result));
+            router.push(`/payment/confirmation?bookingId=${result.bookingId}`);
+          }
+        }
+      } catch (err) {
+        if (err instanceof ApiError) {
+          setApiError(err.message);
+        } else {
+          setApiError("Đặt tour thất bại. Vui lòng thử lại.");
+        }
+        console.error("Booking error:", err);
       } finally {
         setLoading(false);
       }
@@ -455,7 +549,7 @@ function PaymentContent() {
                     Đang xử lý...
                   </>
                 ) : (
-                  `Xác Nhận Đặt Tour — ${formatPrice(finalPrice)}`
+                  `Xác Nhận Đặt Tour — ${finalPrice.toLocaleString("vi-VN")}đ`
                 )}
               </button>
 
@@ -571,29 +665,155 @@ function PaymentContent() {
                 )}
               </div>
 
-              <div className="border-t border-gray-100 pt-4 space-y-2 text-sm">
-                <div className="flex justify-between text-gray-600">
-                  <span>Người lớn × {adults}</span>
-                  <span>{formatPrice(adultTotal)}</span>
+              {/* Khối Điểm thưởng tích lũy */}
+              <div className="border-t border-gray-100 pt-4 pb-4">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                  <span className="text-indigo-600 font-bold">✨</span>
+                  Điểm thưởng thành viên
+                </h4>
+
+                {/* Display current point balance */}
+                <div className="mb-3 bg-indigo-50/30 p-2.5 rounded-xl border border-indigo-100/50 flex justify-between items-center flex-wrap gap-1">
+                  <span className="text-xs text-slate-600 font-bold">Bạn đang có:</span>
+                  <div className="text-right">
+                    <span className="text-xs font-extrabold text-indigo-600 bg-white border border-indigo-100 px-2 py-0.5 rounded-lg shadow-sm">
+                      {profile?.point?.toLocaleString("vi-VN") ?? 0} điểm
+                    </span>
+                    <span className="text-[10px] text-slate-400 block mt-1">
+                      (Tương đương {((profile?.point ?? 0) * 100).toLocaleString("vi-VN")}đ)
+                    </span>
+                  </div>
+                </div>
+
+                {/* Membership tier benefits summary */}
+                <div className="mb-3 bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[10px] text-slate-500 font-semibold space-y-1">
+                  <div className="flex justify-between">
+                    <span>Hạng thành viên:</span>
+                    <span className="text-slate-800 font-bold">{profile?.currentTierName ?? "Standard"}</span>
+                  </div>
+                  {tierDiscountPercentage > 0 && (
+                    <div className="flex justify-between">
+                      <span>Ưu đãi giảm giá trực tiếp:</span>
+                      <span className="text-rose-600 font-bold">-{tierDiscountPercentage}%</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span>Hệ số nhân điểm thưởng:</span>
+                    <span className="text-indigo-600 font-bold">x{pointsMultiplier}</span>
+                  </div>
+                </div>
+
+                {/* Inputs & Actions */}
+                {profile?.point && profile.point > 0 ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max={profile?.point ?? 0}
+                        placeholder="Nhập số điểm muốn dùng..."
+                        value={pointsInput}
+                        onChange={(e) => {
+                          const valStr = e.target.value;
+                          setPointsInput(valStr);
+                          const val = parseInt(valStr);
+                          const maxAllowed = totalPrice - discountAmount - tierDiscountAmount;
+                          if (isNaN(val) || valStr.trim() === "") {
+                            setPointsToUse(0);
+                            setPointsError(null);
+                          } else if (val < 0) {
+                            setPointsToUse(0);
+                            setPointsError("Số điểm không được âm");
+                          } else if (val > (profile?.point ?? 0)) {
+                            setPointsToUse(0);
+                            setPointsError(`Số điểm tối đa bạn có là ${profile?.point}`);
+                          } else if (val * 100 > maxAllowed) {
+                            setPointsToUse(0);
+                            setPointsError("Điểm quy đổi vượt quá giá trị thanh toán");
+                          } else {
+                            setPointsToUse(val);
+                            setPointsError(null);
+                          }
+                        }}
+                        className={`flex-grow px-3 py-2 border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 ${pointsError ? "border-rose-500 focus:ring-rose-400" : "border-slate-200 focus:ring-indigo-400"
+                          }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleUseMaxPoints}
+                        className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-extrabold text-xs rounded-xl uppercase tracking-wider transition-all shrink-0"
+                      >
+                        Dùng tối đa
+                      </button>
+                    </div>
+                    {pointsError && (
+                      <p className="text-[10px] text-rose-500 font-bold">{pointsError}</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-slate-50 rounded-xl border border-dashed border-slate-200 text-center">
+                    <p className="text-[11px] text-slate-400 font-bold leading-relaxed">
+                      Hoàn thành chuyến đi này để bắt đầu tích lũy điểm thưởng!
+                    </p>
+                  </div>
+                )}
+
+                {/* Điểm tích lũy dự kiến nhận được từ đơn hàng */}
+                <div className="mt-3 bg-gradient-to-r from-amber-50 to-orange-50/50 p-2.5 rounded-xl border border-amber-100 text-center shadow-sm">
+                  <p className="text-[10px] text-amber-800 font-bold flex items-center justify-center gap-1">
+                    Đi du lịch tích thêm: <strong className="text-orange-600 font-black">{Math.max(1, Math.floor((finalPrice / 10000) * pointsMultiplier))} điểm</strong>
+                  </p>
+                </div>
+              </div>
+
+              {/* Tóm tắt chi phí cập nhật real-time */}
+              <div className="border-t border-gray-100 pt-4 space-y-2.5 text-sm">
+                <div className="flex justify-between text-gray-600 font-medium">
+                  <span>Tổng giá trị Tour</span>
+                  <span>{totalPrice.toLocaleString("vi-VN")}đ</span>
+                </div>
+                <div className="flex justify-between text-gray-500 text-xs pl-2">
+                  <span>— Người lớn × {adults}</span>
+                  <span>{adultTotal.toLocaleString("vi-VN")}đ</span>
                 </div>
                 {children > 0 && (
-                  <div className="flex justify-between text-gray-600">
-                    <span>Trẻ em × {children}</span>
-                    <span>{formatPrice(childTotal)}</span>
+                  <div className="flex justify-between text-gray-500 text-xs pl-2">
+                    <span>— Trẻ em × {children}</span>
+                    <span>{childTotal.toLocaleString("vi-VN")}đ</span>
                   </div>
                 )}
-                {selectedDiscount && (
-                  <div className="flex justify-between text-rose-600 font-semibold bg-rose-50/50 p-2.5 rounded-xl border border-rose-100/50">
-                    <span className="flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5 fill-rose-500 text-rose-500 shrink-0" />
-                      Giảm giá ({selectedDiscount.code})
+
+                {/* Giảm giá thành viên từ Hạng Membership */}
+                {tierDiscountPercentage > 0 && (
+                  <div className="flex justify-between text-gray-600 font-medium bg-rose-50/20 p-2 rounded-xl border border-rose-100/30">
+                    <span className="flex items-center gap-1">
+                      <span className="text-rose-500">🏷️</span>
+                      Giảm giá thành viên ({profile?.currentTierName})
                     </span>
-                    <span>-{formatPrice(discountAmount)}</span>
+                    <span className="text-rose-600 font-extrabold">-{tierDiscountAmount.toLocaleString("vi-VN")}đ</span>
                   </div>
                 )}
+
+                <div className="flex justify-between text-gray-600 font-medium">
+                  <span>Giảm giá (Voucher)</span>
+                  <span className={selectedDiscount ? "text-rose-600 font-bold" : ""}>
+                    {selectedDiscount ? `-${discountAmount.toLocaleString("vi-VN")}đ` : "0đ"}
+                  </span>
+                </div>
+
+                {/* Điểm thưởng dùng giảm giá */}
+                <div className="flex justify-between text-gray-600 font-medium">
+                  <span>Điểm thưởng{pointsToUse > 0 ? ` (Dùng ${pointsToUse.toLocaleString("vi-VN")} điểm)` : ""}</span>
+                  <span className={pointsToUse > 0 ? "text-[#00D084] font-black" : ""}>
+                    {pointsToUse > 0 ? `- ${(pointsToUse * 100).toLocaleString("vi-VN")}đ` : "0đ"}
+                  </span>
+                </div>
+
                 <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
-                  <span className="font-bold text-gray-900">Tổng cộng</span>
-                  <span className="font-black text-[#00D084] text-2xl">{formatPrice(finalPrice)}</span>
+                  <span className="font-extrabold text-gray-900 text-base">Thành tiền</span>
+                  <span className="font-black text-[#00D084] text-2xl tracking-tight">
+                    {finalPrice.toLocaleString("vi-VN")}đ
+                  </span>
                 </div>
               </div>
 

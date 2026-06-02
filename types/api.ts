@@ -30,6 +30,10 @@ export interface UserProfile {
   identityNumber?: string;  // Số CMND / CCCD / Hộ chiếu
   point?: number;
   createdAt?: string;
+  currentTierName?: string;
+  totalSpent?: number;
+  pointsMultiplier?: number;
+  discountPercentage?: number;
 }
 
 export interface UpdateProfileRequest {
@@ -117,6 +121,7 @@ export interface BookingRequestDTO {
   paymentMethod: PaymentMethod;
   departureDate?: string;
   note?: string;
+  pointsToUse?: number;
 }
 
 export interface BookingResponseDTO {
@@ -156,6 +161,7 @@ export interface BookingResponseDTO {
   tourImage?: string;
   tourGuidePhone?: string;
   licensePlate?: string;
+  tourType?: string;
 }
 
 // ---------- MoMo Payment ----------

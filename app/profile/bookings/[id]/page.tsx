@@ -1443,7 +1443,11 @@ export default function BookingDetailPage() {
                       </div>
                     </div>
 
-                    {paymentUrl ? (
+                    {tour?.tourType === "PRIVATE" || bookingDto?.tourType === "PRIVATE" ? (
+                      <Link href={`/payment?bookingId=${booking.id}&tourId=${tour?.id || bookingDto?.tourId}&scheduleId=${bookingDto?.tourScheduleId || booking.tourSchedule?.id}&adults=${booking.adults}&children=${booking.children}`} className="block w-full text-center py-3.5 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-sky-100 active:scale-[0.98] transition-all">
+                        Thanh toán ngay
+                      </Link>
+                    ) : paymentUrl ? (
                       <a href={paymentUrl} className="block w-full text-center py-3.5 bg-gradient-to-r from-sky-500 to-indigo-500 hover:from-sky-600 hover:to-indigo-600 text-white font-black rounded-2xl text-xs uppercase tracking-wider shadow-lg shadow-sky-100 active:scale-[0.98] transition-all">
                         Thanh toán ngay
                       </a>
