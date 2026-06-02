@@ -164,7 +164,16 @@ function TourDetailContent() {
     return minDate.toISOString().split("T")[0];
   };
 
-  const schedules = tour?.schedules || [];
+  const schedules = useMemo(() => {
+    const rawSchedules = tour?.schedules || [];
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() + 3);
+    minDate.setHours(0, 0, 0, 0);
+    return rawSchedules.filter((s) => {
+      if (!s.startDate) return false;
+      return new Date(s.startDate) >= minDate;
+    });
+  }, [tour]);
   const selectedSchedule = schedules.find((s) => s.id === selectedScheduleId);
   const maxSlots = selectedSchedule ? (selectedSchedule.availableSlot ?? 0) : Infinity;
   const isMaxReached = (adults + children) >= maxSlots;
