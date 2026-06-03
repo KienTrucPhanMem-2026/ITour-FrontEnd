@@ -60,6 +60,16 @@ axiosClient.interceptors.response.use(
         return Promise.reject(new ApiError(401, "Phiên đăng nhập hết hạn. Vui lòng đăng nhập lại."));
       }
 
+      // 🛡️ Nếu là public endpoint, không cần refresh - trả error thẳng
+      const url = originalRequest.url || "";
+      const publicEndpoints = ["/tours", "/tour-itineraries", "/tour-schedules", "/discounts", "/locations", "/tour-images", "/reviews", "/banners", "/blogs"];
+      const isPublicEndpoint = publicEndpoints.some(ep => url.includes(ep));
+      
+      if (isPublicEndpoint) {
+        // Public endpoint không nên trả 401 - có lỗi gì đó
+        return Promise.reject(new ApiError(401, "Không thể tải dữ liệu. Vui lòng thử lại sau."));
+      }
+
       if (isRefreshing) {
         // Đang refresh → xếp hàng chờ
         return new Promise((resolve, reject) => {
